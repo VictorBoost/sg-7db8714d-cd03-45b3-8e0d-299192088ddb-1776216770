@@ -1,6 +1,6 @@
 ---
 title: Design System & Database Foundation
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags: [design, database, auth]
@@ -14,9 +14,9 @@ Set up BlueTika's design system (NZ blue/teal palette, Outfit + Work Sans fonts)
 
 ## Checklist
 - [x] Convert brand hex colors to HSL via terminal
-- [ ] Update globals.css with BlueTika color tokens
-- [ ] Configure Outfit + Work Sans in tailwind.config.ts
-- [ ] Create database tables: profiles (user_type, is_client, is_provider), projects (title, description, budget, location, status), bids (amount, message, status), contracts (project_id, provider_id, final_amount, status)
-- [ ] Apply RLS policies (T1 for profiles, T2 for projects/bids/contracts)
-- [ ] Set up auth trigger for automatic profile creation
-- [ ] Create authService integration
+- [x] Update globals.css with BlueTika color tokens
+- [x] Configure Outfit + Work Sans in tailwind.config.ts
+- [x] Create database tables: profiles (user_type, is_client, is_provider), projects (title, description, budget, location, status), bids (amount, message, status), contracts (project_id, provider_id, final_amount, status)
+- [x] Apply RLS policies (T1 for profiles, T2 for projects/bids/contracts)
+- [x] Set up auth trigger for automatic profile creation
+- [x] Create authService integration
