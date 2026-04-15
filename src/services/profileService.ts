@@ -30,10 +30,13 @@ export const profileService = {
   },
 
   async toggleUserType(userId: string, type: "client" | "provider", enabled: boolean) {
-    const field = type === "client" ? "is_client" : "is_provider";
+    const updates: Partial<Profile> = type === "client" 
+      ? { is_client: enabled } 
+      : { is_provider: enabled };
+      
     const { data, error } = await supabase
       .from("profiles")
-      .update({ [field]: enabled })
+      .update(updates)
       .eq("id", userId)
       .select()
       .single();
