@@ -7,13 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { EvidencePhotoUpload } from "@/components/EvidencePhotoUpload";
+import { ReviewSubmissionModal } from "@/components/ReviewSubmissionModal";
 import Link from "next/link";
-import { DollarSign, MapPin, Calendar, CalendarPlus, CheckCircle, Camera } from "lucide-react";
+import { DollarSign, MapPin, Calendar, CalendarPlus, CheckCircle, Camera, Star } from "lucide-react";
 import { contractService } from "@/services/contractService";
 import { routineBookingService } from "@/services/routineBookingService";
 import { authService } from "@/services/authService";
 import { googleCalendarService } from "@/services/googleCalendarService";
 import { getEvidenceStatusSummary, getContractEvidencePhotos, type EvidenceStatusSummary, type EvidencePhoto } from "@/services/evidencePhotoService";
+import { hasUserSubmittedReview, areBothReviewsSubmitted } from "@/services/reviewService";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -39,6 +41,10 @@ export default function Contracts() {
   const [checkingCalendar, setCheckingCalendar] = useState(true);
   const [addingToCalendar, setAddingToCalendar] = useState<{[key: string]: boolean}>({});
   const [expandedContracts, setExpandedContracts] = useState<{[key: string]: boolean}>({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<ExtendedContract | null>(null);
+  const [userReviewStatus, setUserReviewStatus] = useState<{[key: string]: boolean}>({});
+  const [bothReviewsSubmitted, setBothReviewsSubmitted] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     loadContracts();
@@ -91,6 +97,8 @@ export default function Contracts() {
       const bookingsMap: {[key: string]: RoutineBooking[]} = {};
       const statusMap: {[key: string]: EvidenceStatusSummary} = {};
       const photosMap: {[key: string]: EvidencePhoto[]} = {};
+      const reviewStatusMap: {[key: string]: boolean} = {};
+      const bothReviewsMap: {[key: string]: boolean} = {};
       
       for (const contract of combined) {
         if (contract.project?.booking_type === "routine") {
@@ -108,6 +116,20 @@ export default function Contracts() {
             
             const photos = await getContractEvidencePhotos(contract.id);
             photosMap[contract.id] = photos;
+            
+            // Check review status if both after photos are confirmed
+            if (status.both_after_confirmed) {
+              const isClient = contract.client_id === session.user.id;
+              const hasReview = await hasUserSubmittedReview(
+                contract.id,
+                session.user.id,
+                isClient ? "client" : "provider"
+              );
+              reviewStatusMap[contract.id] = hasReview;
+              
+              const bothReviews = await areBothReviewsSubmitted(contract.id);
+              bothReviewsMap[contract.id] = bothReviews;
+            }
           } catch (error) {
             console.error("Error loading evidence data:", error);
           }
@@ -117,6 +139,8 @@ export default function Contracts() {
       setRoutineBookings(bookingsMap);
       setEvidenceStatus(statusMap);
       setEvidencePhotos(photosMap);
+      setUserReviewStatus(reviewStatusMap);
+      setBothReviewsSubmitted(bothReviewsMap);
     }
     
     setLoading(false);
@@ -243,6 +267,17 @@ export default function Contracts() {
     }
   };
 
+  const handleOpenReviewModal = (contract: ExtendedContract) => {
+    setSelectedContract(contract);
+    setReviewModalOpen(true);
+  };
+
+  const handleReviewSubmitted = async () => {
+    if (selectedContract) {
+      await loadContracts();
+    }
+  };
+
   const statusColors = {
     active: "bg-accent/10 text-accent border-accent/20",
     completed: "bg-success/10 text-success border-success/20",
@@ -339,6 +374,9 @@ export default function Contracts() {
                 const hasRoutineBookings = contract.project?.booking_type === "routine" && routineBookings[contract.id]?.length > 0;
                 const status = evidenceStatus[contract.id];
                 const isExpanded = expandedContracts[contract.id];
+                const hasSubmittedReview = userReviewStatus[contract.id];
+                const bothReviews = bothReviewsSubmitted[contract.id];
+                const showReviewButton = status?.both_after_confirmed && !hasSubmittedReview && !bothReviews;
                 
                 return (
                   <div key={contract.id} className="space-y-4">
@@ -394,7 +432,7 @@ export default function Contracts() {
                           </div>
                         )}
                         
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <Button asChild variant="outline" className="flex-1">
                             <Link href={`/project/${contract.project_id}`}>
                               View Project
@@ -432,6 +470,30 @@ export default function Contracts() {
                                   <Camera className="h-4 w-4 mr-2" />
                                   Photos
                                 </Button>
+                              )}
+
+                              {showReviewButton && (
+                                <Button
+                                  onClick={() => handleOpenReviewModal(contract)}
+                                  variant="default"
+                                  className="bg-accent hover:bg-accent/90"
+                                >
+                                  <Star className="h-4 w-4 mr-2" />
+                                  Submit Review
+                                </Button>
+                              )}
+
+                              {hasSubmittedReview && !bothReviews && (
+                                <Badge variant="outline" className="bg-success/10 text-success border-success/20 py-2 px-3">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Review Submitted
+                                </Badge>
+                              )}
+
+                              {bothReviews && (
+                                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 py-2 px-3">
+                                  Awaiting Fund Release
+                                </Badge>
                               )}
                             </>
                           )}
@@ -490,6 +552,28 @@ export default function Contracts() {
         
         <Footer />
       </div>
+
+      {/* Review Submission Modal */}
+      {selectedContract && (
+        <ReviewSubmissionModal
+          isOpen={reviewModalOpen}
+          onClose={() => {
+            setReviewModalOpen(false);
+            setSelectedContract(null);
+          }}
+          contractId={selectedContract.id}
+          clientId={selectedContract.client_id}
+          providerId={selectedContract.provider_id}
+          reviewerRole={selectedContract.client_id === userId ? "client" : "provider"}
+          revieweeName={
+            selectedContract.client_id === userId
+              ? (selectedContract.provider?.full_name || selectedContract.provider?.email || "Service Provider")
+              : (selectedContract.client?.full_name || selectedContract.client?.email || "Client")
+          }
+          projectTitle={selectedContract.project?.title || "Project"}
+          onReviewSubmitted={handleReviewSubmitted}
+        />
+      )}
     </>
   );
 }
