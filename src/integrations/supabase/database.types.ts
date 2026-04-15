@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1015,6 +1015,9 @@ export type Database = {
           id: string
           project_id: string
           provider_id: string
+          reminder_sent: boolean | null
+          reminder_sent_at: string | null
+          routine_contract_id: string | null
           session_date: string
           status: string | null
           updated_at: string | null
@@ -1028,6 +1031,9 @@ export type Database = {
           id?: string
           project_id: string
           provider_id: string
+          reminder_sent?: boolean | null
+          reminder_sent_at?: string | null
+          routine_contract_id?: string | null
           session_date: string
           status?: string | null
           updated_at?: string | null
@@ -1041,6 +1047,9 @@ export type Database = {
           id?: string
           project_id?: string
           provider_id?: string
+          reminder_sent?: boolean | null
+          reminder_sent_at?: string | null
+          routine_contract_id?: string | null
           session_date?: string
           status?: string | null
           updated_at?: string | null
@@ -1069,6 +1078,140 @@ export type Database = {
           },
           {
             foreignKeyName: "routine_bookings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_bookings_routine_contract_id_fkey"
+            columns: ["routine_contract_id"]
+            isOneToOne: false
+            referencedRelation: "routine_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routine_contracts: {
+        Row: {
+          activated_at: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          client_agreed: boolean | null
+          client_agreed_at: string | null
+          client_id: string
+          created_at: string | null
+          custom_days: number | null
+          frequency: string
+          id: string
+          last_session_date: string | null
+          next_session_date: string | null
+          original_contract_id: string
+          paused_at: string | null
+          paused_by: string | null
+          project_id: string
+          provider_agreed: boolean | null
+          provider_agreed_at: string | null
+          provider_id: string
+          selected_days: string[] | null
+          sessions_completed: number | null
+          start_date: string
+          status: string
+          total_revenue: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_agreed?: boolean | null
+          client_agreed_at?: string | null
+          client_id: string
+          created_at?: string | null
+          custom_days?: number | null
+          frequency: string
+          id?: string
+          last_session_date?: string | null
+          next_session_date?: string | null
+          original_contract_id: string
+          paused_at?: string | null
+          paused_by?: string | null
+          project_id: string
+          provider_agreed?: boolean | null
+          provider_agreed_at?: string | null
+          provider_id: string
+          selected_days?: string[] | null
+          sessions_completed?: number | null
+          start_date: string
+          status?: string
+          total_revenue?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_agreed?: boolean | null
+          client_agreed_at?: string | null
+          client_id?: string
+          created_at?: string | null
+          custom_days?: number | null
+          frequency?: string
+          id?: string
+          last_session_date?: string | null
+          next_session_date?: string | null
+          original_contract_id?: string
+          paused_at?: string | null
+          paused_by?: string | null
+          project_id?: string
+          provider_agreed?: boolean | null
+          provider_agreed_at?: string | null
+          provider_id?: string
+          selected_days?: string[] | null
+          sessions_completed?: number | null
+          start_date?: string
+          status?: string
+          total_revenue?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_contracts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_contracts_original_contract_id_fkey"
+            columns: ["original_contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_contracts_paused_by_fkey"
+            columns: ["paused_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_contracts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_contracts_provider_id_fkey"
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "profiles"

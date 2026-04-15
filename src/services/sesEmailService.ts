@@ -877,6 +877,176 @@ export async function sendAdditionalChargePaymentEmail(
 }
 
 /**
+ * Send routine contract invitation to both parties
+ */
+export async function sendRoutineContractInvitation(
+  recipientEmail: string,
+  recipientName: string,
+  recipientRole: "client" | "provider",
+  otherPartyName: string,
+  projectTitle: string,
+  routineId: string
+): Promise<boolean> {
+  const subject = "BlueTika: Set Up Routine Arrangement?";
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #1B4FD8; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .button { display: inline-block; background: #06B6D4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .highlight { background: #E0F2FE; border-left: 4px solid #06B6D4; padding: 15px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Routine Arrangement Available</h1>
+        </div>
+        <div class="content">
+          <p>Kia ora ${recipientName},</p>
+          
+          <p>Now that your project is complete, would you like to set up a routine arrangement with <strong>${otherPartyName}</strong>?</p>
+          
+          <p><strong>Project:</strong> ${projectTitle}</p>
+          
+          <div class="highlight">
+            <p><strong>✨ Perfect for regular services</strong></p>
+            <p>Setting up a routine arrangement saves you time and keeps things sorted — no need to create a new project each time!</p>
+          </div>
+          
+          <p><strong>How it works:</strong></p>
+          <ul>
+            <li>Choose your frequency (Weekly, Fortnightly, Monthly, or Custom)</li>
+            <li>Select which days work best (for Domestic Helper services)</li>
+            <li>Set your start date</li>
+            <li>Get automatic reminders 48 hours before each session</li>
+            <li>Add sessions to your Google Calendar</li>
+          </ul>
+          
+          <p>You can pause or cancel the routine anytime from your dashboard.</p>
+          
+          <a href="https://bluetika.co.nz/contracts" class="button">Set Up Routine</a>
+          
+          <p><em>Both parties need to agree before the routine becomes active.</em></p>
+          
+          <p>Ngā mihi,<br>The BlueTika Team</p>
+        </div>
+        <div class="footer">
+          <p>100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    htmlBody
+  });
+}
+
+/**
+ * Send 48-hour reminder before scheduled session
+ */
+export async function sendSessionReminderEmail(
+  recipientEmail: string,
+  recipientName: string,
+  recipientRole: "client" | "provider",
+  otherPartyName: string,
+  projectTitle: string,
+  sessionDate: string,
+  location: string
+): Promise<boolean> {
+  const formattedDate = new Date(sessionDate).toLocaleDateString("en-NZ", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+
+  const subject = `BlueTika: Session Reminder - ${projectTitle}`;
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #1B4FD8; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .date-box { background: #E0F2FE; border: 2px solid #06B6D4; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center; }
+        .date { font-size: 24px; font-weight: bold; color: #1B4FD8; }
+        .info-box { background: white; border: 1px solid #E5E7EB; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .button { display: inline-block; background: #06B6D4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>⏰ Session in 48 Hours</h1>
+        </div>
+        <div class="content">
+          <p>Kia ora ${recipientName},</p>
+          
+          <p>This is a reminder that you have a scheduled session coming up:</p>
+          
+          <div class="date-box">
+            <div class="date">${formattedDate}</div>
+          </div>
+          
+          <div class="info-box">
+            <p><strong>Project:</strong> ${projectTitle}</p>
+            <p><strong>${recipientRole === "client" ? "Service Provider" : "Client"}:</strong> ${otherPartyName}</p>
+            <p><strong>Location:</strong> ${location}</p>
+          </div>
+          
+          <p><strong>What to prepare:</strong></p>
+          <ul>
+            ${recipientRole === "client" ? `
+              <li>Ensure the location is accessible</li>
+              <li>Have any special requirements ready</li>
+              <li>Be available to communicate if needed</li>
+            ` : `
+              <li>Confirm you have all necessary equipment</li>
+              <li>Plan your route to the location</li>
+              <li>Review any special client requirements</li>
+            `}
+          </ul>
+          
+          <div style="text-align: center;">
+            <a href="https://bluetika.co.nz/contracts" class="button">View Details</a>
+            <a href="https://bluetika.co.nz/contracts" class="button">Add to Calendar</a>
+          </div>
+          
+          <p>If you need to reschedule or have any questions, please contact ${otherPartyName} directly.</p>
+          
+          <p>Ngā mihi,<br>The BlueTika Team</p>
+        </div>
+        <div class="footer">
+          <p>100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    htmlBody
+  });
+}
+
+/**
  * Strip HTML tags for plain text fallback
  */
 function stripHtml(html: string): string {
