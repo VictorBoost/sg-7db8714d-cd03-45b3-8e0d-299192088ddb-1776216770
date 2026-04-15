@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -15,6 +15,94 @@ export type Database = {
   }
   public: {
     Tables: {
+      additional_charges: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          client_id: string
+          commission_amount: number | null
+          commission_rate: number | null
+          contract_id: string
+          created_at: string | null
+          declined_at: string | null
+          id: string
+          net_to_provider: number | null
+          paid_at: string | null
+          payment_processing_fee: number | null
+          platform_fee: number | null
+          provider_id: string
+          reason: string
+          status: string
+          stripe_payment_intent_id: string | null
+          total_amount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          client_id: string
+          commission_amount?: number | null
+          commission_rate?: number | null
+          contract_id: string
+          created_at?: string | null
+          declined_at?: string | null
+          id?: string
+          net_to_provider?: number | null
+          paid_at?: string | null
+          payment_processing_fee?: number | null
+          platform_fee?: number | null
+          provider_id: string
+          reason: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          client_id?: string
+          commission_amount?: number | null
+          commission_rate?: number | null
+          contract_id?: string
+          created_at?: string | null
+          declined_at?: string | null
+          id?: string
+          net_to_provider?: number | null
+          paid_at?: string | null
+          payment_processing_fee?: number | null
+          platform_fee?: number | null
+          provider_id?: string
+          reason?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "additional_charges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "additional_charges_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "additional_charges_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bids: {
         Row: {
           amount: number

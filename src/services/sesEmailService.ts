@@ -631,6 +631,252 @@ Questions? Contact us at support@bluetika.co.nz
 }
 
 /**
+ * Send additional charge request notification to client
+ */
+export async function sendAdditionalChargeRequestEmail(
+  recipientEmail: string,
+  recipientName: string,
+  providerName: string,
+  projectTitle: string,
+  amount: number,
+  reason: string,
+  chargeId: string
+): Promise<boolean> {
+  const subject = "BlueTika: Additional Charge Request";
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #1B4FD8; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .button { display: inline-block; background: #06B6D4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 10px 20px 0; }
+        .button-decline { background: #DC2626; }
+        .amount-box { background: #E0F2FE; border: 2px solid #06B6D4; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center; }
+        .amount { font-size: 32px; font-weight: bold; color: #1B4FD8; }
+        .reason-box { background: white; border: 1px solid #E5E7EB; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Additional Charge Request</h1>
+        </div>
+        <div class="content">
+          <p>Kia ora ${recipientName},</p>
+          
+          <p><strong>${providerName}</strong> has requested an additional charge for your project:</p>
+          
+          <p><strong>Project:</strong> ${projectTitle}</p>
+          
+          <div class="amount-box">
+            <p style="margin: 0; font-size: 14px; color: #666;">Requested Amount</p>
+            <div class="amount">NZD $${amount.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+          
+          <div class="reason-box">
+            <h4 style="margin-top: 0;">Reason for Additional Charge</h4>
+            <p>${reason}</p>
+          </div>
+          
+          <p><strong>What happens next:</strong></p>
+          <ul>
+            <li>Review the request and reason provided</li>
+            <li>Approve to proceed with payment (includes 2% platform fee + payment processing)</li>
+            <li>Or decline if you don't agree with the additional charge</li>
+          </ul>
+          
+          <div style="text-align: center;">
+            <a href="https://bluetika.co.nz/contracts" class="button">Review Request</a>
+          </div>
+          
+          <p>If you have questions, please discuss with ${providerName} before making a decision.</p>
+          
+          <p>Ngā mihi,<br>The BlueTika Team</p>
+        </div>
+        <div class="footer">
+          <p>100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    htmlBody
+  });
+}
+
+/**
+ * Send additional charge response notification (approved/declined)
+ */
+export async function sendAdditionalChargeResponseEmail(
+  recipientEmail: string,
+  recipientName: string,
+  clientName: string,
+  projectTitle: string,
+  amount: number,
+  status: "approved" | "declined"
+): Promise<boolean> {
+  const subject = status === "approved" 
+    ? "BlueTika: Additional Charge Approved ✅" 
+    : "BlueTika: Additional Charge Declined";
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: ${status === "approved" ? "#10B981" : "#DC2626"}; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .status-box { background: ${status === "approved" ? "#D1FAE5" : "#FEE2E2"}; border: 2px solid ${status === "approved" ? "#10B981" : "#DC2626"}; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Additional Charge ${status === "approved" ? "Approved" : "Declined"}</h1>
+        </div>
+        <div class="content">
+          <p>Kia ora ${recipientName},</p>
+          
+          <p><strong>${clientName}</strong> has ${status === "approved" ? "approved" : "declined"} your additional charge request for:</p>
+          
+          <p><strong>Project:</strong> ${projectTitle}</p>
+          <p><strong>Amount:</strong> NZD $${amount.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          
+          <div class="status-box">
+            <h3 style="margin: 0;">${status === "approved" 
+              ? "✅ Request Approved" 
+              : "❌ Request Declined"}</h3>
+          </div>
+          
+          ${status === "approved" ? `
+            <p><strong>Next Steps:</strong></p>
+            <p>The client will complete payment shortly. You'll receive your payout (minus BlueTika commission at your current tier rate) once payment is confirmed.</p>
+          ` : `
+            <p>If you have questions about this decision, please contact the client directly to discuss.</p>
+          `}
+          
+          <p>Ngā mihi,<br>The BlueTika Team</p>
+        </div>
+        <div class="footer">
+          <p>100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    htmlBody
+  });
+}
+
+/**
+ * Send additional charge payment confirmation
+ */
+export async function sendAdditionalChargePaymentEmail(
+  recipientEmail: string,
+  recipientName: string,
+  recipientRole: "client" | "provider",
+  projectTitle: string,
+  chargeAmount: number,
+  commissionAmount: number,
+  netToProvider: number
+): Promise<boolean> {
+  const subject = "BlueTika: Additional Charge Payment Confirmed 💰";
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #10B981; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .amount-box { background: #E0F2FE; border: 2px solid #06B6D4; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center; }
+        .amount { font-size: 32px; font-weight: bold; color: #1B4FD8; }
+        .breakdown { background: white; border: 1px solid #E5E7EB; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .breakdown-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #E5E7EB; }
+        .breakdown-row:last-child { border-bottom: none; font-weight: bold; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Payment Confirmed!</h1>
+        </div>
+        <div class="content">
+          <p>Kia ora ${recipientName},</p>
+          
+          <p>The additional charge payment has been processed for your project:</p>
+          
+          <p><strong>Project:</strong> ${projectTitle}</p>
+          
+          ${recipientRole === "provider" ? `
+            <div class="amount-box">
+              <p style="margin: 0; font-size: 14px; color: #666;">Your Payout</p>
+              <div class="amount">NZD $${netToProvider.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            
+            <div class="breakdown">
+              <h3 style="margin-top: 0;">Payment Breakdown</h3>
+              <div class="breakdown-row">
+                <span>Additional Charge</span>
+                <span>NZD $${chargeAmount.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div class="breakdown-row">
+                <span>BlueTika Commission</span>
+                <span>- NZD $${commissionAmount.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div class="breakdown-row">
+                <span>Net to You</span>
+                <span>NZD $${netToProvider.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+            
+            <p>The funds will be transferred to your registered bank account within 2-3 business days.</p>
+          ` : `
+            <div class="amount-box">
+              <p style="margin: 0; font-size: 14px; color: #666;">Payment Amount</p>
+              <div class="amount">NZD $${chargeAmount.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            
+            <p>Thank you for your payment. The service provider will receive their payout within 2-3 business days.</p>
+          `}
+          
+          <p>Ngā mihi,<br>The BlueTika Team</p>
+        </div>
+        <div class="footer">
+          <p>100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    htmlBody
+  });
+}
+
+/**
  * Strip HTML tags for plain text fallback
  */
 function stripHtml(html: string): string {
