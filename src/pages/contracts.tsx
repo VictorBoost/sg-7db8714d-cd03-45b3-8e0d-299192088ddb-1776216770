@@ -79,7 +79,7 @@ export default function Contracts() {
       const { data: clientContracts } = await contractService.getUserContracts(session.user.id, "client");
       const { data: providerContracts } = await contractService.getUserContracts(session.user.id, "provider");
       
-      const combined = [...(clientContracts || []), ...(providerContracts || [])] as ExtendedContract[];
+      const combined = [...(clientContracts || []), ...(providerContracts || [])] as unknown as ExtendedContract[];
       setContracts(combined);
       
       // Load routine bookings for each contract
