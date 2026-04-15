@@ -81,7 +81,7 @@ export default function Checkout() {
     const isConnected = await googleCalendarService.isConnected(session.user.id);
     setCalendarConnected(isConnected);
 
-    const { data } = await contractService.getUserContracts(session.user.id, "client");
+    const { data } = await contractService.getUserContracts(session.user.id);
     const foundContract = data?.find(c => c.id === contractId);
 
     if (foundContract) {
