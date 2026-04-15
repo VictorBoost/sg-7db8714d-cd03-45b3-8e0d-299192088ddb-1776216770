@@ -29,7 +29,11 @@ export default function Projects() {
     );
     
     if (!error && data) {
-      setProjects(data);
+      const projectsWithBidCount = data.map((project: any) => ({
+        ...project,
+        bid_count: project.bids ? project.bids.length : 0
+      }));
+      setProjects(projectsWithBidCount);
     }
     setLoading(false);
   };
