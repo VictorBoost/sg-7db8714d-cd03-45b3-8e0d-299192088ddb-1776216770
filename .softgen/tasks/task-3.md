@@ -1,6 +1,6 @@
 ---
 title: Service Provider Bidding System
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [bidding, providers, verification]
