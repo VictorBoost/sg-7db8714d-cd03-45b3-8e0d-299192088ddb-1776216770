@@ -181,6 +181,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           city_region: string | null
+          commission_tier: string | null
           created_at: string | null
           date_of_birth: string | null
           domestic_helper_verified: boolean | null
@@ -208,6 +209,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           city_region?: string | null
+          commission_tier?: string | null
           created_at?: string | null
           date_of_birth?: string | null
           domestic_helper_verified?: boolean | null
@@ -235,6 +237,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           city_region?: string | null
+          commission_tier?: string | null
           created_at?: string | null
           date_of_birth?: string | null
           domestic_helper_verified?: boolean | null

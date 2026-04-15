@@ -258,7 +258,8 @@ export default function ProjectDetail() {
       estimated_timeline: bidData.estimated_timeline,
       message: bidData.message,
       trade_certificate_url: tradeCertUrl,
-      status: "pending"
+      status: "pending",
+      is_visible: true
     });
     
     if (error) {

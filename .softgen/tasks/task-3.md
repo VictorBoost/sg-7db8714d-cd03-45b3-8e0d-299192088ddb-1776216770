@@ -20,6 +20,6 @@ Complete bidding system for verified service providers. Browse open listings wit
 - [x] Update ProjectCard to show all required info (title, category, subcategory, budget, location, date, bid count, time posted)
 - [x] Implement full bid submission form (price, timeline, terms, trade cert upload)
 - [x] Show commission tier badge and 8% promotional rate notice
-- [ ] Implement Domestic Helper verification check (hide DH bids from clients if provider not DH-verified)
-- [ ] Add navigation link to My Bids for providers
-- [ ] Test complete bidding flow end-to-end
+- [x] Implement Domestic Helper verification check (hide DH bids from clients if provider not DH-verified)
+- [x] Add navigation link to My Bids for providers
+- [x] Test complete bidding flow end-to-end
