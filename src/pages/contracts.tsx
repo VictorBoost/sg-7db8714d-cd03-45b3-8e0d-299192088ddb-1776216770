@@ -82,7 +82,7 @@ export default function Contracts() {
       // Load routine bookings for each contract
       const bookingsMap: {[key: string]: RoutineBooking[]} = {};
       for (const contract of combined) {
-        if (contract.is_routine) {
+        if (contract.projects?.booking_type === "routine") {
           const { data: bookings } = await routineBookingService.getContractBookings(contract.id);
           if (bookings && bookings.length > 0) {
             bookingsMap[contract.id] = bookings;
@@ -118,7 +118,7 @@ export default function Contracts() {
         : "Client";
 
       // For routine contracts, add all upcoming sessions
-      if (contract.is_routine) {
+      if (contract.projects?.booking_type === "routine") {
         const bookings = routineBookings[contract.id] || [];
         const futureBookings = bookings.filter(b => 
           new Date(b.session_date) >= new Date() && !b.google_calendar_event_id
@@ -201,8 +201,8 @@ export default function Contracts() {
     cancelled: "bg-muted text-muted-foreground border-muted",
   };
 
-  const getCalendarButtonText = (contract: Contract) => {
-    if (contract.is_routine) {
+  const getCalendarButtonText = (contract: Contract & { projects?: { booking_type?: string | null } }) => {
+    if (contract.projects?.booking_type === "routine") {
       const bookings = routineBookings[contract.id] || [];
       const futureBookings = bookings.filter(b => 
         new Date(b.session_date) >= new Date() && !b.google_calendar_event_id
@@ -218,8 +218,8 @@ export default function Contracts() {
     return contract.google_calendar_event_id ? "Added to Calendar" : "Add to Calendar";
   };
 
-  const isCalendarButtonDisabled = (contract: Contract) => {
-    if (contract.is_routine) {
+  const isCalendarButtonDisabled = (contract: Contract & { projects?: { booking_type?: string | null } }) => {
+    if (contract.projects?.booking_type === "routine") {
       const bookings = routineBookings[contract.id] || [];
       const futureBookings = bookings.filter(b => 
         new Date(b.session_date) >= new Date() && !b.google_calendar_event_id
@@ -281,7 +281,7 @@ export default function Contracts() {
             <div className="grid md:grid-cols-2 gap-6">
               {contracts.map(contract => {
                 const isProvider = contract.provider_id === userId;
-                const hasRoutineBookings = contract.is_routine && routineBookings[contract.id]?.length > 0;
+                const hasRoutineBookings = contract.projects?.booking_type === "routine" && routineBookings[contract.id]?.length > 0;
                 
                 return (
                   <Card key={contract.id}>
@@ -299,7 +299,7 @@ export default function Contracts() {
                           <Badge variant="outline" className={statusColors[contract.status]}>
                             {contract.status}
                           </Badge>
-                          {contract.is_routine && (
+                          {contract.projects?.booking_type === "routine" && (
                             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                               Routine
                             </Badge>

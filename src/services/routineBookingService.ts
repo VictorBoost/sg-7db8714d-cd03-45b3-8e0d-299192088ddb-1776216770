@@ -99,6 +99,17 @@ export const routineBookingService = {
     return { data, error };
   },
 
+  // Get contract bookings
+  async getContractBookings(contractId: string) {
+    const { data, error } = await supabase
+      .from("routine_bookings")
+      .select("*")
+      .eq("contract_id", contractId)
+      .order("session_date");
+
+    return { data, error };
+  },
+
   // Update booking status
   async updateBookingStatus(bookingId: string, status: string, contractId?: string) {
     const updates: any = { status };
