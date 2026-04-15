@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SEO } from "@/components/SEO";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -6,23 +6,41 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { projectService } from "@/services/projectService";
+import { categoryService } from "@/services/categoryService";
 import { authService } from "@/services/authService";
 import { useToast } from "@/hooks/use-toast";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Category = Tables<"categories">;
 
 export default function PostProject() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     budget: "",
     location: "",
+    category_id: "",
   });
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    const { data } = await categoryService.getAllCategories();
+    if (data) {
+      setCategories(data);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +51,16 @@ export default function PostProject() {
       toast({
         title: "Authentication required",
         description: "Please sign in to post a project",
+        variant: "destructive",
+      });
+      router.push("/login");
+      return;
+    }
+
+    if (!formData.category_id) {
+      toast({
+        title: "Category required",
+        description: "Please select a category for your project",
         variant: "destructive",
       });
       return;
@@ -47,7 +75,7 @@ export default function PostProject() {
       location: formData.location,
       client_id: session.user.id,
       status: "open",
-      category: "other",
+      category_id: formData.category_id,
     });
 
     if (error) {
@@ -109,6 +137,26 @@ export default function PostProject() {
                       onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                       required
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select 
+                      value={formData.category_id} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">

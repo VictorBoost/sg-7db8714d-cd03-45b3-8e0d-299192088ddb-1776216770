@@ -8,19 +8,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { projectService } from "@/services/projectService";
+import { categoryService } from "@/services/categoryService";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Project = Tables<"projects">;
+type Category = Tables<"categories">;
 
 export default function Projects() {
   const [projects, setProjects] = useState<(Project & { bid_count: number })[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress" | "completed">("open");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   useEffect(() => {
+    loadCategories();
     loadProjects();
   }, [statusFilter]);
+
+  const loadCategories = async () => {
+    const { data } = await categoryService.getAllCategories();
+    if (data) {
+      setCategories(data);
+    }
+  };
 
   const loadProjects = async () => {
     setLoading(true);
@@ -38,11 +50,15 @@ export default function Projects() {
     setLoading(false);
   };
 
-  const filteredProjects = projects.filter(p => 
-    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProjects = projects.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.location.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = categoryFilter === "all" || p.category_id === categoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <>
@@ -79,6 +95,19 @@ export default function Projects() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full md:w-48">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={(v: typeof statusFilter) => setStatusFilter(v)}>
                 <SelectTrigger className="w-full md:w-48">
                   <SelectValue placeholder="Filter by status" />
