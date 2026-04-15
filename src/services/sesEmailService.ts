@@ -622,7 +622,12 @@ Questions? Contact us at support@bluetika.co.nz
 100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz
   `.trim();
 
-  await sendEmail(recipientEmail, subject, htmlBody, textBody);
+  await sendEmail({
+    to: recipientEmail,
+    subject,
+    htmlBody,
+    textBody
+  });
 }
 
 /**
