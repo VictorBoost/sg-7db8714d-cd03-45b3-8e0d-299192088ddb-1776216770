@@ -13,7 +13,7 @@ import { contractService } from "@/services/contractService";
 import { routineBookingService } from "@/services/routineBookingService";
 import { authService } from "@/services/authService";
 import { googleCalendarService } from "@/services/googleCalendarService";
-import { getEvidenceStatusSummary, type EvidenceStatusSummary } from "@/services/evidencePhotoService";
+import { getEvidenceStatusSummary, getContractEvidencePhotos, type EvidenceStatusSummary, type EvidencePhoto } from "@/services/evidencePhotoService";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -32,6 +32,7 @@ export default function Contracts() {
   const [contracts, setContracts] = useState<ExtendedContract[]>([]);
   const [routineBookings, setRoutineBookings] = useState<{[key: string]: RoutineBooking[]}>({});
   const [evidenceStatus, setEvidenceStatus] = useState<{[key: string]: EvidenceStatusSummary}>({});
+  const [evidencePhotos, setEvidencePhotos] = useState<{[key: string]: EvidencePhoto[]}>({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
@@ -86,9 +87,10 @@ export default function Contracts() {
       const combined = [...(clientContracts || []), ...(providerContracts || [])] as unknown as ExtendedContract[];
       setContracts(combined);
       
-      // Load routine bookings and evidence status for each contract
+      // Load routine bookings, evidence status, and photos for each contract
       const bookingsMap: {[key: string]: RoutineBooking[]} = {};
       const statusMap: {[key: string]: EvidenceStatusSummary} = {};
+      const photosMap: {[key: string]: EvidencePhoto[]} = {};
       
       for (const contract of combined) {
         if (contract.project?.booking_type === "routine") {
@@ -98,19 +100,23 @@ export default function Contracts() {
           }
         }
         
-        // Load evidence status for active contracts
+        // Load evidence status and photos for active contracts
         if (contract.status === "active") {
           try {
             const status = await getEvidenceStatusSummary(contract.id);
             statusMap[contract.id] = status;
+            
+            const photos = await getContractEvidencePhotos(contract.id);
+            photosMap[contract.id] = photos;
           } catch (error) {
-            console.error("Error loading evidence status:", error);
+            console.error("Error loading evidence data:", error);
           }
         }
       }
       
       setRoutineBookings(bookingsMap);
       setEvidenceStatus(statusMap);
+      setEvidencePhotos(photosMap);
     }
     
     setLoading(false);
@@ -126,12 +132,17 @@ export default function Contracts() {
   const handleEvidenceUpdate = async (contractId: string) => {
     try {
       const status = await getEvidenceStatusSummary(contractId);
+      const photos = await getContractEvidencePhotos(contractId);
       setEvidenceStatus(prev => ({
         ...prev,
         [contractId]: status
       }));
+      setEvidencePhotos(prev => ({
+        ...prev,
+        [contractId]: photos
+      }));
     } catch (error) {
-      console.error("Error updating evidence status:", error);
+      console.error("Error updating evidence data:", error);
     }
   };
 
@@ -264,6 +275,12 @@ export default function Contracts() {
       return futureBookings.length === 0;
     }
     return !!contract.google_calendar_event_id;
+  };
+
+  const getPhotosForUpload = (contractId: string, photoType: "before" | "after", role: "client" | "provider") => {
+    const photos = evidencePhotos[contractId] || [];
+    const photo = photos.find(p => p.photo_type === photoType && p.uploader_role === role);
+    return photo?.photo_urls || [];
   };
 
   return (
@@ -433,7 +450,7 @@ export default function Contracts() {
                             contractId={contract.id}
                             photoType="before"
                             uploaderRole={isClient ? "client" : "provider"}
-                            currentPhotos={[]}
+                            currentPhotos={getPhotosForUpload(contract.id, "before", isClient ? "client" : "provider")}
                             currentStatus={isClient ? status.client_before : status.provider_before}
                             otherPartyStatus={isClient ? status.provider_before : status.client_before}
                             onUpdate={() => handleEvidenceUpdate(contract.id)}
@@ -447,7 +464,7 @@ export default function Contracts() {
                               contractId={contract.id}
                               photoType="after"
                               uploaderRole={isClient ? "client" : "provider"}
-                              currentPhotos={[]}
+                              currentPhotos={getPhotosForUpload(contract.id, "after", isClient ? "client" : "provider")}
                               currentStatus={isClient ? status.client_after : status.provider_after}
                               otherPartyStatus={isClient ? status.provider_after : status.client_after}
                               onUpdate={() => handleEvidenceUpdate(contract.id)}

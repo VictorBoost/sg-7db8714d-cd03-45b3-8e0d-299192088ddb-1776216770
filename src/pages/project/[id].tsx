@@ -17,9 +17,10 @@ import { bidService } from "@/services/bidService";
 import { BidCard } from "@/components/BidCard";
 import { ProviderProfileModal } from "@/components/ProviderProfileModal";
 import { AcceptBidModal } from "@/components/AcceptBidModal";
-import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Video as VideoIcon, RefreshCw, FileText, Shield } from "lucide-react";
+import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Video as VideoIcon, RefreshCw, FileText, Shield, Camera } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { getEvidenceStatusSummary, type EvidenceStatusSummary } from "@/services/evidencePhotoService";
 
 type Project = Tables<"projects">;
 type Bid = Tables<"bids">;
@@ -128,6 +129,16 @@ export default function ProjectDetail() {
     } else {
       setProject(data);
       setBids(data?.bids || []);
+      
+      // Check evidence photo status if project has an active contract
+      if (data?.contract?.id && data.contract.status === "active") {
+        try {
+          const status = await getEvidenceStatusSummary(data.contract.id);
+          // Store in component state if needed for UI display
+        } catch (error) {
+          console.error("Error loading evidence status:", error);
+        }
+      }
     }
     
     setLoading(false);
