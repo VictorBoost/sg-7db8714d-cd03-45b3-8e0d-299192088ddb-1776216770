@@ -98,7 +98,7 @@ export default function Projects() {
                 <p className="text-muted-foreground mb-4">No projects found</p>
                 <Button asChild>
                   <Link href="/post-project">Post the first project</Link>
-                </Link>
+                </Button>
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
