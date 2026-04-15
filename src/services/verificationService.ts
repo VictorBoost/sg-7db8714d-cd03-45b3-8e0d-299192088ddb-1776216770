@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
 type VerificationDocument = Tables<"verification_documents">;
-type Reference = Tables<"references">;
+type Reference = Tables<"provider_references">;
 
 export const verificationService = {
   // Upload verification document
@@ -62,7 +62,7 @@ export const verificationService = {
   // Add reference
   async addReference(providerId: string, subcategoryId: string, referenceData: Partial<Reference>) {
     const { data, error } = await supabase
-      .from("references")
+      .from("provider_references")
       .insert({
         provider_id: providerId,
         subcategory_id: subcategoryId,
@@ -78,7 +78,7 @@ export const verificationService = {
   // Get provider's references
   async getProviderReferences(providerId: string, subcategoryId?: string) {
     let query = supabase
-      .from("references")
+      .from("provider_references")
       .select("*")
       .eq("provider_id", providerId);
 
