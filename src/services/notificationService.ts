@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { sendEvidencePhotoReminder as sendEmailReminder } from "./sesEmailService";
 
 type Notification = Tables<"notifications">;
 
@@ -8,7 +9,7 @@ export const notificationService = {
     userId: string,
     title: string,
     message: string,
-    type: "info" | "success" | "warning" | "payment" | "contract" = "info",
+    type: "info" | "success" | "warning" | "payment" | "contract" | "evidence_photo" = "info",
     relatedContractId?: string,
     relatedProjectId?: string
   ) {
@@ -71,5 +72,33 @@ export const notificationService = {
     console.log("markAllAsRead:", { data, error });
     if (error) console.error("Bulk notification update error:", error);
     return { data, error };
+  },
+
+  async sendEvidencePhotoReminder(
+    contractId: string,
+    userId: string,
+    userEmail: string,
+    userName: string,
+    photoType: "before" | "after",
+    projectTitle: string
+  ) {
+    const title = `${photoType === "before" ? "Before" : "After"} Photos Required`;
+    const message = `Please upload your ${photoType} photos for "${projectTitle}". Both parties must confirm their photos before ${photoType === "before" ? "work can begin" : "the contract can be completed"}.`;
+
+    await this.createNotification(
+      userId,
+      title,
+      message,
+      "evidence_photo",
+      contractId
+    );
+
+    await sendEmailReminder(
+      userEmail,
+      userName,
+      contractId,
+      photoType,
+      projectTitle
+    );
   },
 };
