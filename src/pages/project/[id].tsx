@@ -131,9 +131,10 @@ export default function ProjectDetail() {
       setBids(data?.bids || []);
       
       // Check evidence photo status if project has an active contract
-      if (data?.contract?.id && data.contract.status === "active") {
+      const projectData = data as any;
+      if (projectData?.contract?.id && projectData.contract.status === "active") {
         try {
-          const status = await getEvidenceStatusSummary(data.contract.id);
+          const status = await getEvidenceStatusSummary(projectData.contract.id);
           // Store in component state if needed for UI display
         } catch (error) {
           console.error("Error loading evidence status:", error);
