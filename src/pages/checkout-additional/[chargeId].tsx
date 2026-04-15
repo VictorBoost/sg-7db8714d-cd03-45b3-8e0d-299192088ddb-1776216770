@@ -183,6 +183,12 @@ export default function CheckoutAdditionalCharge() {
         return;
       }
 
+      const idToFetch = typeof chargeId === "string" ? chargeId : "";
+      
+      if (!idToFetch) {
+        throw new Error("Invalid charge ID");
+      }
+
       // Get charge details
       const { data: charge, error: chargeError } = await supabase
         .from("additional_charges")
@@ -193,7 +199,7 @@ export default function CheckoutAdditionalCharge() {
           ),
           provider:profiles!additional_charges_provider_id_fkey(full_name, email, current_tier)
         `)
-        .eq("id", chargeId)
+        .eq("id", idToFetch)
         .single();
 
       if (chargeError || !charge) {
