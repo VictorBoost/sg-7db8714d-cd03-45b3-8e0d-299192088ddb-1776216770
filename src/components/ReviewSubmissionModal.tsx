@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Star } from "lucide-react";
 import { submitReview } from "@/services/reviewService";
 import { contractService } from "@/services/contractService";
-import { sendAdminFundReleaseNotification } from "@/services/sesEmailService";
+import { sendAdminFundReleaseNotification, sendRoutineContractInvitation } from "@/services/sesEmailService";
 import { areBothReviewsSubmitted } from "@/services/reviewService";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ReviewSubmissionModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface ReviewSubmissionModalProps {
   revieweeName: string;
   projectTitle: string;
   onReviewSubmitted: () => void;
+  onRoutinePromptTrigger?: () => void;
 }
 
 export function ReviewSubmissionModal({
@@ -31,7 +33,8 @@ export function ReviewSubmissionModal({
   reviewerRole,
   revieweeName,
   projectTitle,
-  onReviewSubmitted
+  onReviewSubmitted,
+  onRoutinePromptTrigger
 }: ReviewSubmissionModalProps) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -82,10 +85,48 @@ export function ReviewSubmissionModal({
         // Send admin notification
         await sendAdminFundReleaseNotification(contractId, projectTitle);
 
+        // Send routine contract invitations to both parties
+        const { data: clientProfile } = await supabase
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", clientId)
+          .single();
+
+        const { data: providerProfile } = await supabase
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", providerId)
+          .single();
+
+        if (clientProfile && providerProfile) {
+          await sendRoutineContractInvitation(
+            clientProfile.email,
+            clientProfile.full_name || "there",
+            "client",
+            providerProfile.full_name || "Service Provider",
+            projectTitle,
+            contractId
+          );
+
+          await sendRoutineContractInvitation(
+            providerProfile.email,
+            providerProfile.full_name || "there",
+            "provider",
+            clientProfile.full_name || "Client",
+            projectTitle,
+            contractId
+          );
+        }
+
         toast({
           title: "Review Submitted",
           description: "Both reviews submitted. Admin has been notified to release funds."
         });
+
+        // Trigger routine contract prompt after a short delay
+        setTimeout(() => {
+          onRoutinePromptTrigger?.();
+        }, 1000);
       } else {
         toast({
           title: "Review Submitted",

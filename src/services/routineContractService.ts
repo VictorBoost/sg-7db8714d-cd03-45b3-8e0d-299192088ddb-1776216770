@@ -82,7 +82,7 @@ export const routineContractService = {
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + (8 * 7)); // 8 weeks ahead
 
-    let currentDate = new Date(startDate);
+    const currentDate = new Date(startDate);
 
     while (currentDate <= endDate) {
       // Check if this date should have a booking
