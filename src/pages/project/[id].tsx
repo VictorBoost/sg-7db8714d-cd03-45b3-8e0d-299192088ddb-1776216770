@@ -15,7 +15,7 @@ import { authService } from "@/services/authService";
 import { projectService } from "@/services/projectService";
 import { bidService } from "@/services/bidService";
 import { BidCard } from "@/components/BidCard";
-import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Image as ImageIcon, Video as VideoIcon, RefreshCw } from "lucide-react";
+import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Video as VideoIcon, RefreshCw, Upload, FileText, Shield } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -34,10 +34,15 @@ export default function ProjectDetail() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isProvider, setIsProvider] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [isDHVerified, setIsDHVerified] = useState(false);
+  const [commissionTier, setCommissionTier] = useState<string>("bronze");
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
+  const [tradeCertFile, setTradeCertFile] = useState<File | null>(null);
+  const [uploadingCert, setUploadingCert] = useState(false);
   const [bidData, setBidData] = useState({
     amount: "",
+    estimated_timeline: "",
     message: "",
   });
 
@@ -89,13 +94,15 @@ export default function ProjectDetail() {
       
       const { data: profile } = await supabase
         .from("profiles")
-        .select("is_provider, verification_status")
+        .select("is_provider, verification_status, domestic_helper_verified, commission_tier")
         .eq("id", session.user.id)
         .single();
       
       if (profile) {
         setIsProvider(profile.is_provider || false);
         setIsVerified(profile.verification_status === "approved");
+        setIsDHVerified(profile.domestic_helper_verified || false);
+        setCommissionTier(profile.commission_tier || "bronze");
       }
     }
   };
@@ -154,6 +161,33 @@ export default function ProjectDetail() {
     setReopening(false);
   };
 
+  const handleTradeCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "Trade certificate must be under 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF, JPG, or PNG file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTradeCertFile(file);
+  };
+
   const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -185,14 +219,45 @@ export default function ProjectDetail() {
       router.push("/provider/verify");
       return;
     }
+
+    // Check Domestic Helper verification for DH listings
+    const isDomesticHelper = project.category?.name === "Domestic Helper";
+    if (isDomesticHelper && !isDHVerified) {
+      toast({
+        title: "Domestic Helper verification required",
+        description: "You must complete Domestic Helper verification (including police check and first aid certificate) to bid on this listing",
+        variant: "destructive",
+      });
+      router.push("/provider/verify-domestic-helper");
+      return;
+    }
     
     setSubmitting(true);
+
+    let tradeCertUrl = null;
+    if (tradeCertFile) {
+      setUploadingCert(true);
+      tradeCertUrl = await bidService.uploadTradeCertificate(tradeCertFile, currentUser.id);
+      setUploadingCert(false);
+      
+      if (!tradeCertUrl) {
+        toast({
+          title: "Upload failed",
+          description: "Failed to upload trade certificate. Please try again.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+    }
     
     const { data, error } = await bidService.createBid({
       project_id: id as string,
       provider_id: currentUser.id,
       amount: parseFloat(bidData.amount),
+      estimated_timeline: bidData.estimated_timeline,
       message: bidData.message,
+      trade_certificate_url: tradeCertUrl,
       status: "pending"
     });
     
@@ -207,7 +272,8 @@ export default function ProjectDetail() {
         title: "Success",
         description: "Bid submitted successfully!",
       });
-      setBidData({ amount: "", message: "" });
+      setBidData({ amount: "", estimated_timeline: "", message: "" });
+      setTradeCertFile(null);
       loadProject();
     }
     
@@ -227,6 +293,16 @@ export default function ProjectDetail() {
       default:
         return "Not specified";
     }
+  };
+
+  const getTierInfo = () => {
+    const tiers = {
+      bronze: { name: "Bronze", color: "bg-amber-700/10 text-amber-700 border-amber-700/20" },
+      silver: { name: "Silver", color: "bg-slate-400/10 text-slate-400 border-slate-400/20" },
+      gold: { name: "Gold", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
+      platinum: { name: "Platinum", color: "bg-cyan-400/10 text-cyan-400 border-cyan-400/20" },
+    };
+    return tiers[commissionTier as keyof typeof tiers] || tiers.bronze;
   };
 
   if (loading) {
@@ -252,9 +328,11 @@ export default function ProjectDetail() {
   };
 
   const isOwner = currentUser?.id === project.client_id;
-  const canBid = isProvider && isVerified && !isOwner && project.status === "open" && !project.is_expired;
+  const isDomesticHelper = project.category?.name === "Domestic Helper";
+  const canBid = isProvider && isVerified && !isOwner && project.status === "open" && !project.is_expired && (!isDomesticHelper || isDHVerified);
   const photos = project.photos || [];
   const hasMedia = photos.length > 0 || project.video_url;
+  const tierInfo = getTierInfo();
 
   return (
     <>
@@ -263,7 +341,7 @@ export default function ProjectDetail() {
         description={project.description}
       />
       <div className="min-h-screen flex flex-col bg-background">
-        <header className="border-b bg-white">
+        <header className="border-b bg-card">
           <div className="container py-4 flex justify-between items-center">
             <Link href="/" className="text-2xl font-bold text-primary">
               BlueTika
@@ -273,9 +351,16 @@ export default function ProjectDetail() {
                 <Link href="/projects">Browse Projects</Link>
               </Button>
               {currentUser ? (
-                <Button asChild>
-                  <Link href="/contracts">My Contracts</Link>
-                </Button>
+                <>
+                  {isProvider && (
+                    <Button variant="ghost" asChild>
+                      <Link href="/my-bids">My Bids</Link>
+                    </Button>
+                  )}
+                  <Button asChild>
+                    <Link href="/contracts">My Contracts</Link>
+                  </Button>
+                </>
               ) : (
                 <Button asChild>
                   <Link href="/login">Login</Link>
@@ -302,6 +387,11 @@ export default function ProjectDetail() {
                             <Badge variant="secondary">
                               <Tag className="h-3 w-3 mr-1" />
                               {project.category.name}
+                            </Badge>
+                          )}
+                          {project.subcategory && (
+                            <Badge variant="outline">
+                              {project.subcategory.name}
                             </Badge>
                           )}
                           {project.is_expired && (
@@ -436,16 +526,49 @@ export default function ProjectDetail() {
                   </CardContent>
                 </Card>
 
+                {isDomesticHelper && isProvider && !isDHVerified && !isOwner && (
+                  <Alert>
+                    <Shield className="h-4 w-4" />
+                    <AlertDescription>
+                      <div className="flex items-center justify-between">
+                        <span>Domestic Helper verification required to bid on this listing (police check + first aid certificate)</span>
+                        <Button variant="outline" size="sm" asChild className="ml-4">
+                          <Link href="/provider/verify-domestic-helper">
+                            Complete Verification
+                          </Link>
+                        </Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {canBid && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Submit Your Bid</CardTitle>
-                      <CardDescription>
-                        Make your offer for this project
-                      </CardDescription>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>Submit Your Bid</CardTitle>
+                          <CardDescription>
+                            Make your offer for this project
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className={tierInfo.color}>
+                          {tierInfo.name} Tier
+                        </Badge>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <form onSubmit={handleBidSubmit} className="space-y-4">
+                        <Alert className="bg-accent/5 border-accent/20">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            <p className="font-medium mb-1">Commission Rate: 8% (Promotional)</p>
+                            <p className="text-sm text-muted-foreground">
+                              Currently all tiers are at 8% promotional rate. Standard rates will apply after the promotional period.
+                            </p>
+                          </AlertDescription>
+                        </Alert>
+
                         <div className="space-y-2">
                           <Label htmlFor="amount">Your Bid Amount (NZD) *</Label>
                           <Input
@@ -458,26 +581,58 @@ export default function ProjectDetail() {
                             step="0.01"
                             required
                           />
+                          <p className="text-xs text-muted-foreground">
+                            8% commission will be added to your bid at checkout
+                          </p>
                         </div>
+
                         <div className="space-y-2">
-                          <Label htmlFor="message">Message to Client *</Label>
-                          <Textarea
-                            id="message"
-                            placeholder="Explain why you're the right person for this job..."
-                            value={bidData.message}
-                            onChange={(e) => setBidData({ ...bidData, message: e.target.value })}
-                            rows={4}
+                          <Label htmlFor="timeline">Estimated Timeline *</Label>
+                          <Input
+                            id="timeline"
+                            placeholder="e.g., 2 weeks, 3-5 days, 1 month"
+                            value={bidData.estimated_timeline}
+                            onChange={(e) => setBidData({ ...bidData, estimated_timeline: e.target.value })}
                             required
                           />
                         </div>
-                        <Alert>
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            A 2% platform fee will be added to your bid amount at checkout
-                          </AlertDescription>
-                        </Alert>
-                        <Button type="submit" className="w-full" disabled={submitting}>
-                          {submitting ? "Submitting..." : "Submit Bid"}
+
+                        <div className="space-y-2">
+                          <Label htmlFor="message">Description of Terms & What's Included *</Label>
+                          <Textarea
+                            id="message"
+                            placeholder="Explain your approach, what's included in your bid, payment terms, and why you're the right person for this job..."
+                            value={bidData.message}
+                            onChange={(e) => setBidData({ ...bidData, message: e.target.value })}
+                            rows={6}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="tradeCert">Trade Certificate (Optional)</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="tradeCert"
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={handleTradeCertUpload}
+                              className="cursor-pointer"
+                            />
+                          </div>
+                          {tradeCertFile && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <FileText className="h-4 w-4" />
+                              <span>{tradeCertFile.name} ({(tradeCertFile.size / 1024 / 1024).toFixed(2)}MB)</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            PDF, JPG, or PNG. Max 10MB
+                          </p>
+                        </div>
+
+                        <Button type="submit" className="w-full" disabled={submitting || uploadingCert}>
+                          {submitting ? "Submitting..." : uploadingCert ? "Uploading certificate..." : "Submit Bid"}
                         </Button>
                       </form>
                     </CardContent>

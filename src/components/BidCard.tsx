@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User } from "lucide-react";
+import { DollarSign, User, Clock, FileText } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Bid = Tables<"bids">;
@@ -35,14 +35,22 @@ export function BidCard({ bid, isProjectOwner, onAccept, accepting }: BidCardPro
               <CardTitle className="text-lg">
                 {bid.profiles?.full_name || bid.profiles?.email || "Service Provider"}
               </CardTitle>
-              <CardDescription className="text-sm mt-1">
-                <span className="flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  <span className="font-semibold text-foreground">
-                    NZD ${bid.amount.toLocaleString()}
+              <div className="flex items-center gap-3 mt-2">
+                <CardDescription className="text-sm">
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-4 w-4" />
+                    <span className="font-semibold text-foreground">
+                      NZD ${bid.amount.toLocaleString()}
+                    </span>
                   </span>
-                </span>
-              </CardDescription>
+                </CardDescription>
+                {bid.estimated_timeline && (
+                  <CardDescription className="text-sm flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{bid.estimated_timeline}</span>
+                  </CardDescription>
+                )}
+              </div>
             </div>
           </div>
           <Badge variant="outline" className={statusColors[bid.status]}>
@@ -50,10 +58,24 @@ export function BidCard({ bid, isProjectOwner, onAccept, accepting }: BidCardPro
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-          {bid.message}
-        </p>
+      <CardContent className="space-y-3">
+        <div>
+          <p className="text-sm font-medium mb-1">Terms & What's Included</p>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {bid.message}
+          </p>
+        </div>
+        
+        {bid.trade_certificate_url && (
+          <div className="pt-2 border-t">
+            <Button variant="outline" size="sm" asChild className="w-full">
+              <a href={bid.trade_certificate_url} target="_blank" rel="noopener noreferrer">
+                <FileText className="h-4 w-4 mr-2" />
+                View Trade Certificate
+              </a>
+            </Button>
+          </div>
+        )}
       </CardContent>
       {isProjectOwner && bid.status === "pending" && onAccept && (
         <CardFooter>
