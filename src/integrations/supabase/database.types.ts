@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -107,6 +107,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      contract_evidence_photos: {
+        Row: {
+          confirmed_at: string | null
+          contract_id: string
+          created_at: string | null
+          id: string
+          photo_type: string
+          photo_urls: string[] | null
+          reminder_sent_at: string | null
+          status: string
+          updated_at: string | null
+          uploader_role: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          contract_id: string
+          created_at?: string | null
+          id?: string
+          photo_type: string
+          photo_urls?: string[] | null
+          reminder_sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+          uploader_role: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          contract_id?: string
+          created_at?: string | null
+          id?: string
+          photo_type?: string
+          photo_urls?: string[] | null
+          reminder_sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+          uploader_role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_evidence_photos_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contracts: {
         Row: {
