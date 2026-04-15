@@ -15,271 +15,32 @@ export type Database = {
   }
   public: {
     Tables: {
-      bids: {
-        Row: {
-          amount: number
-          created_at: string | null
-          id: string
-          message: string
-          project_id: string
-          provider_id: string
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          id?: string
-          message: string
-          project_id: string
-          provider_id: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          id?: string
-          message?: string
-          project_id?: string
-          provider_id?: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bids_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bids_provider_id_fkey"
-            columns: ["provider_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          display_order: number | null
-          icon: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          slug: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          icon?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          slug: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          icon?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          slug?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      contracts: {
-        Row: {
-          bid_id: string
-          client_id: string
-          completed_at: string | null
-          created_at: string | null
-          final_amount: number
-          id: string
-          project_id: string
-          provider_id: string
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          bid_id: string
-          client_id: string
-          completed_at?: string | null
-          created_at?: string | null
-          final_amount: number
-          id?: string
-          project_id: string
-          provider_id: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          bid_id?: string
-          client_id?: string
-          completed_at?: string | null
-          created_at?: string | null
-          final_amount?: number
-          id?: string
-          project_id?: string
-          provider_id?: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "contracts_bid_id_fkey"
-            columns: ["bid_id"]
-            isOneToOne: false
-            referencedRelation: "bids"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: true
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_provider_id_fkey"
-            columns: ["provider_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
-          bio: string | null
-          city_region: string | null
           created_at: string | null
-          driver_licence_verified: boolean | null
           email: string | null
-          first_name: string | null
           full_name: string | null
-          gst_enabled: boolean | null
           id: string
-          is_client: boolean | null
-          is_provider: boolean | null
-          last_name: string | null
-          location: string | null
-          phone: string | null
-          phone_number: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
-          bio?: string | null
-          city_region?: string | null
           created_at?: string | null
-          driver_licence_verified?: boolean | null
           email?: string | null
-          first_name?: string | null
           full_name?: string | null
-          gst_enabled?: boolean | null
           id: string
-          is_client?: boolean | null
-          is_provider?: boolean | null
-          last_name?: string | null
-          location?: string | null
-          phone?: string | null
-          phone_number?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
-          bio?: string | null
-          city_region?: string | null
           created_at?: string | null
-          driver_licence_verified?: boolean | null
           email?: string | null
-          first_name?: string | null
           full_name?: string | null
-          gst_enabled?: boolean | null
           id?: string
-          is_client?: boolean | null
-          is_provider?: boolean | null
-          last_name?: string | null
-          location?: string | null
-          phone?: string | null
-          phone_number?: string | null
           updated_at?: string | null
         }
         Relationships: []
-      }
-      projects: {
-        Row: {
-          budget: number
-          category_id: string | null
-          client_id: string
-          created_at: string | null
-          description: string
-          id: string
-          location: string
-          status: string | null
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          budget: number
-          category_id?: string | null
-          client_id: string
-          created_at?: string | null
-          description: string
-          id?: string
-          location: string
-          status?: string | null
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          budget?: number
-          category_id?: string | null
-          client_id?: string
-          created_at?: string | null
-          description?: string
-          id?: string
-          location?: string
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "projects_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "projects_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {

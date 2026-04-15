@@ -46,39 +46,25 @@ export const authService = {
   },
 
   // Get current session
-  async getCurrentSession(): Promise<Session | null> {
+  async getCurrentSession() {
     const { data: { session } } = await supabase.auth.getSession();
     return session;
   },
 
   // Sign up with email and password
-  async signUp(email: string, password: string): Promise<{ user: AuthUser | null; error: AuthError | null }> {
+  async signUp(email: string, password: string, metadata?: any) {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${getURL()}auth/confirm-email`
+          data: metadata,
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined
         }
       });
-
-      if (error) {
-        return { user: null, error: { message: error.message, code: error.status?.toString() } };
-      }
-
-      const authUser = data.user ? {
-        id: data.user.id,
-        email: data.user.email || "",
-        user_metadata: data.user.user_metadata,
-        created_at: data.user.created_at
-      } : null;
-
-      return { user: authUser, error: null };
-    } catch (error) {
-      return { 
-        user: null, 
-        error: { message: "An unexpected error occurred during sign up" } 
-      };
+      return { user: data.user, error };
+    } catch (error: any) {
+      return { user: null, error };
     }
   },
 

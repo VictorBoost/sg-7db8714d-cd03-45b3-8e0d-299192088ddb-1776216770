@@ -64,7 +64,7 @@ export default function PostProject() {
   }, [formData.category_id, categories]);
 
   const loadCategories = async () => {
-    const { data } = await categoryService.getActiveCategories();
+    const { data } = await categoryService.getAllCategories();
     if (data) {
       setCategories(data);
     }
