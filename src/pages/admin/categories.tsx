@@ -32,6 +32,7 @@ export default function AdminCategories() {
     name: "",
     slug: "",
     description: "",
+    icon: null as string | null,
     is_active: true,
     display_order: 0,
   });
@@ -113,6 +114,7 @@ export default function AdminCategories() {
       name: category.name,
       slug: category.slug,
       description: category.description || "",
+      icon: category.icon,
       is_active: category.is_active,
       display_order: category.display_order,
     });
@@ -160,6 +162,7 @@ export default function AdminCategories() {
       name: "",
       slug: "",
       description: "",
+      icon: null,
       is_active: true,
       display_order: categories.length,
     });
