@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -19,31 +19,40 @@ export type Database = {
         Row: {
           amount: number
           created_at: string | null
+          estimated_timeline: string | null
           id: string
+          is_visible: boolean | null
           message: string
           project_id: string
           provider_id: string
           status: string | null
+          trade_certificate_url: string | null
           updated_at: string | null
         }
         Insert: {
           amount: number
           created_at?: string | null
+          estimated_timeline?: string | null
           id?: string
+          is_visible?: boolean | null
           message: string
           project_id: string
           provider_id: string
           status?: string | null
+          trade_certificate_url?: string | null
           updated_at?: string | null
         }
         Update: {
           amount?: number
           created_at?: string | null
+          estimated_timeline?: string | null
           id?: string
+          is_visible?: boolean | null
           message?: string
           project_id?: string
           provider_id?: string
           status?: string | null
+          trade_certificate_url?: string | null
           updated_at?: string | null
         }
         Relationships: [
