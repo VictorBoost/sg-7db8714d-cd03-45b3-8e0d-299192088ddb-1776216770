@@ -1,3 +1,4 @@
+<![CDATA[
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { SEO } from "@/components/SEO";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProgressSteps } from "@/components/ProgressSteps";
-import { HelpCircle, ShieldCheck } from "lucide-react";
+import { HelpCircle, ShieldCheck, Calendar } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +19,7 @@ import { contractService } from "@/services/contractService";
 import { paymentService } from "@/services/paymentService";
 import { notificationService } from "@/services/notificationService";
 import { authService } from "@/services/authService";
+import { googleCalendarService } from "@/services/googleCalendarService";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Contract = Tables<"contracts">;
@@ -34,9 +36,9 @@ const steps = [
 
 export default function Checkout() {
   const router = useRouter();
-  const { contractId } = router.query;
+  const { contractId, calendar_connected } = router.query;
   const [contract, setContract] = useState<(Contract & {
-    projects?: { title: string };
+    projects?: { title: string; location: string; specific_date?: string | null; date_from?: string | null };
     profiles?: { full_name: string | null; email: string | null };
   }) | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,10 @@ export default function Checkout() {
     processingFee: 0,
     total: 0,
   });
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [calendarEventAdded, setCalendarEventAdded] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (contractId) {
@@ -55,6 +61,14 @@ export default function Checkout() {
       loadProcessingPercentage();
     }
   }, [contractId]);
+
+  useEffect(() => {
+    if (calendar_connected === "true") {
+      setCalendarConnected(true);
+      // Try to add event after OAuth
+      handleAddToCalendar();
+    }
+  }, [calendar_connected]);
 
   const loadContract = async () => {
     setLoading(true);
@@ -64,6 +78,10 @@ export default function Checkout() {
       return;
     }
 
+    setUserId(session.user.id);
+    const isConnected = await googleCalendarService.isConnected(session.user.id);
+    setCalendarConnected(isConnected);
+
     const { data } = await contractService.getUserContracts(session.user.id, "client");
     const foundContract = data?.find(c => c.id === contractId);
 
@@ -71,6 +89,9 @@ export default function Checkout() {
       setContract(foundContract);
       if (foundContract.payment_status === "confirmed") {
         setPaymentConfirmed(true);
+      }
+      if (foundContract.google_calendar_event_id) {
+        setCalendarEventAdded(true);
       }
     }
     setLoading(false);
@@ -134,11 +155,50 @@ export default function Checkout() {
       });
 
       setPaymentConfirmed(true);
+      loadContract(); // Reload to get updated contract
     } catch (error) {
       console.error("Payment error:", error);
       alert("Payment failed. Please try again.");
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleAddToCalendar = async () => {
+    if (!contract || !userId) return;
+
+    if (!calendarConnected) {
+      // Redirect to Google OAuth with contract ID as state
+      const authUrl = googleCalendarService.getAuthUrl(contractId as string);
+      window.location.href = authUrl;
+      return;
+    }
+
+    setAddingToCalendar(true);
+    try {
+      const projectDate = contract.projects?.specific_date || contract.projects?.date_from;
+      if (!projectDate) {
+        alert("No date set for this project");
+        return;
+      }
+
+      await googleCalendarService.createContractEvent(
+        userId,
+        contract.id,
+        contract.projects?.title || "Project",
+        contract.profiles?.full_name || contract.profiles?.email || "Service Provider",
+        projectDate,
+        contract.projects?.location || "",
+        true // isClient
+      );
+
+      setCalendarEventAdded(true);
+      alert("Event added to Google Calendar!");
+    } catch (error) {
+      console.error("Error adding to calendar:", error);
+      alert("Failed to add event to calendar. Please try again.");
+    } finally {
+      setAddingToCalendar(false);
     }
   };
 
@@ -197,7 +257,39 @@ export default function Checkout() {
                   <p><span className="font-semibold">Project:</span> {contract.projects?.title}</p>
                   <p><span className="font-semibold">Service Provider:</span> {contract.profiles?.full_name || contract.profiles?.email}</p>
                   <p><span className="font-semibold">Total Paid:</span> NZD ${fees.total.toLocaleString()}</p>
+                  {contract.projects?.specific_date && (
+                    <p><span className="font-semibold">Scheduled:</span> {new Date(contract.projects.specific_date).toLocaleDateString("en-NZ")}</p>
+                  )}
                 </div>
+
+                <Separator />
+
+                {!calendarEventAdded && (
+                  <>
+                    <Button
+                      onClick={handleAddToCalendar}
+                      disabled={addingToCalendar}
+                      variant="outline"
+                      className="w-full"
+                      size="lg"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      {addingToCalendar ? "Adding..." : calendarConnected ? "Add to Google Calendar" : "Connect Google Calendar"}
+                    </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      Get a 24-hour reminder before your scheduled date
+                    </p>
+                  </>
+                )}
+
+                {calendarEventAdded && (
+                  <Alert className="border-success/20 bg-success/5">
+                    <Calendar className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      Event added to Google Calendar with 24-hour reminder
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 <Separator />
 
@@ -302,3 +394,4 @@ export default function Checkout() {
     </>
   );
 }
+</file_contents>
