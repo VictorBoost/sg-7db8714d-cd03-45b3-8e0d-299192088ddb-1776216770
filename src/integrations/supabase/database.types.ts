@@ -173,7 +173,10 @@ export type Database = {
           bio: string | null
           city_region: string | null
           created_at: string | null
+          date_of_birth: string | null
           domestic_helper_verified: boolean | null
+          driver_licence_number: string | null
+          driver_licence_url: string | null
           driver_licence_verified: boolean | null
           email: string | null
           first_name: string | null
@@ -187,14 +190,20 @@ export type Database = {
           phone: string | null
           phone_number: string | null
           updated_at: string | null
+          verification_rejection_reason: string | null
+          verification_reviewed_at: string | null
           verification_status: string | null
+          verification_submitted_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
           city_region?: string | null
           created_at?: string | null
+          date_of_birth?: string | null
           domestic_helper_verified?: boolean | null
+          driver_licence_number?: string | null
+          driver_licence_url?: string | null
           driver_licence_verified?: boolean | null
           email?: string | null
           first_name?: string | null
@@ -208,14 +217,20 @@ export type Database = {
           phone?: string | null
           phone_number?: string | null
           updated_at?: string | null
+          verification_rejection_reason?: string | null
+          verification_reviewed_at?: string | null
           verification_status?: string | null
+          verification_submitted_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
           city_region?: string | null
           created_at?: string | null
+          date_of_birth?: string | null
           domestic_helper_verified?: boolean | null
+          driver_licence_number?: string | null
+          driver_licence_url?: string | null
           driver_licence_verified?: boolean | null
           email?: string | null
           first_name?: string | null
@@ -229,7 +244,10 @@ export type Database = {
           phone?: string | null
           phone_number?: string | null
           updated_at?: string | null
+          verification_rejection_reason?: string | null
+          verification_reviewed_at?: string | null
           verification_status?: string | null
+          verification_submitted_at?: string | null
         }
         Relationships: []
       }
@@ -305,6 +323,42 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_categories: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          id: string
+          provider_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          id?: string
+          provider_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          id?: string
+          provider_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_categories_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -462,6 +516,44 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_certificates: {
+        Row: {
+          certificate_number: string
+          certificate_type: string
+          created_at: string | null
+          document_url: string
+          id: string
+          provider_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          certificate_number: string
+          certificate_type: string
+          created_at?: string | null
+          document_url: string
+          id?: string
+          provider_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          certificate_number?: string
+          certificate_type?: string
+          created_at?: string | null
+          document_url?: string
+          id?: string
+          provider_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_certificates_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
