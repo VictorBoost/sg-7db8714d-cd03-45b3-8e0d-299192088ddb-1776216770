@@ -243,7 +243,7 @@ export default function ContractsPage() {
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div>
-                            <CardTitle>{contract.project.title}</CardTitle>
+                            <CardTitle>{contract.project?.title || 'Unknown Project'}</CardTitle>
                             <CardDescription>
                               {isClient ? "Service Provider" : "Client"}: {otherParty?.full_name}
                             </CardDescription>
@@ -252,17 +252,21 @@ export default function ContractsPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <ProgressSteps currentStatus={contract.status} />
+                        <ProgressSteps steps={[
+                          { label: "Active", status: contract.status === "active" ? "active" : "completed" },
+                          { label: "Work Done", status: contract.status === "Work Completed" ? "active" : (contract.status === "Evidence Uploaded" || contract.status === "Completed" || contract.status === "Awaiting Fund Release" ? "completed" : "upcoming") },
+                          { label: "Completed", status: contract.status === "Completed" || contract.status === "Awaiting Fund Release" ? "completed" : "upcoming" }
+                        ]} />
                         
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground">Agreed Price</p>
-                            <p className="font-semibold">${contract.agreed_price?.toFixed(2)}</p>
+                            <p className="font-semibold">${contract.final_amount?.toFixed(2) || contract.agreed_price?.toFixed(2) || '0.00'}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Start Date</p>
                             <p className="font-semibold">
-                              {new Date(contract.agreed_start_date).toLocaleDateString("en-NZ")}
+                              {contract.agreed_start_date ? new Date(contract.agreed_start_date).toLocaleDateString("en-NZ") : "Not Set"}
                             </p>
                           </div>
                         </div>
@@ -287,7 +291,12 @@ export default function ContractsPage() {
                         {!isClient && contract.status === "Work Completed" && (
                           <EvidencePhotoUpload
                             contractId={contract.id}
-                            onPhotosUploaded={() => loadContracts(user!.id)}
+                            photoType="after"
+                            uploaderRole="provider"
+                            currentPhotos={[]}
+                            currentStatus="not_uploaded"
+                            otherPartyStatus="not_uploaded"
+                            onUpdate={() => loadContracts(user!.id)}
                           />
                         )}
 

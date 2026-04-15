@@ -5,17 +5,16 @@ import { updateProviderTier } from "./commissionService";
 export type Contract = Tables<"contracts">;
 
 export const contractService = {
-  async getUserContracts(userId: string, role: "client" | "provider") {
-    const field = role === "client" ? "client_id" : "provider_id";
+  async getUserContracts(userId: string) {
     const { data, error } = await supabase
       .from("contracts")
       .select(`
         *,
-        project:projects!contracts_project_id_fkey(id, title, description, category, location, booking_type),
+        project:projects!contracts_project_id_fkey(id, title, description, category_id, location, booking_type),
         provider:profiles!contracts_provider_id_fkey(id, full_name, email, phone),
         client:profiles!contracts_client_id_fkey(id, full_name, email, phone)
       `)
-      .eq(field, userId)
+      .or(`client_id.eq.${userId},provider_id.eq.${userId}`)
       .order("created_at", { ascending: false });
 
     console.log("getUserContracts:", { data, error });

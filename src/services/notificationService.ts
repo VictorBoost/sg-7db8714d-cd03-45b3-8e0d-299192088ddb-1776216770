@@ -10,7 +10,7 @@ export const notificationService = {
     userId: string,
     title: string,
     message: string,
-    notification_type: "contract_update" | "payment" | "bid" | "message" | "general" = "general",
+    type: "contract_update" | "payment" | "bid" | "message" | "general" = "general",
     relatedId?: string
   ) {
     const { data, error } = await supabase
@@ -19,8 +19,8 @@ export const notificationService = {
         user_id: userId,
         title,
         message,
-        notification_type,
-        related_id: relatedId,
+        type,
+        related_contract_id: relatedId,
         is_read: false,
       })
       .select()
