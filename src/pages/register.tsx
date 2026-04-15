@@ -251,36 +251,31 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 p-4 bg-muted rounded-lg">
-                  <Label className="text-base font-semibold">Account Type</Label>
+                <div className="space-y-4">
+                  <Label>I want to use BlueTika as a: *</Label>
                   <div className="space-y-3">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="isClient"
-                        checked={formData.isClient}
-                        onCheckedChange={(checked) => 
-                          handleChange("isClient", checked === true)
-                        }
+                        id="is_client"
+                        checked={formData.is_client}
+                        onCheckedChange={(checked) => setFormData({ ...formData, is_client: !!checked })}
                       />
-                      <Label htmlFor="isClient" className="font-normal cursor-pointer">
-                        Client (Post projects and hire service providers)
+                      <Label htmlFor="is_client" className="font-normal cursor-pointer">
+                        Client (I want to hire service providers)
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="isProvider"
-                        checked={formData.isProvider}
-                        onCheckedChange={(checked) => 
-                          handleChange("isProvider", checked === true)
-                        }
+                        id="is_provider"
+                        checked={formData.is_provider}
+                        onCheckedChange={(checked) => setFormData({ ...formData, is_provider: !!checked })}
                       />
-                      <Label htmlFor="isProvider" className="font-normal cursor-pointer">
-                        Service Provider (Bid on projects and provide services)
+                      <Label htmlFor="is_provider" className="font-normal cursor-pointer">
+                        Service Provider (I want to offer my services)
                       </Label>
                     </div>
                   </div>
-
-                  {formData.isProvider && (
+                  {formData.is_provider && (
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
