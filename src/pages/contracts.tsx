@@ -9,6 +9,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { EvidencePhotoUpload } from "@/components/EvidencePhotoUpload";
 import { ReviewSubmissionModal } from "@/components/ReviewSubmissionModal";
 import { TierProgressCard } from "@/components/TierProgressCard";
+import { AdditionalChargeRequest } from "@/components/AdditionalChargeRequest";
+import { AdditionalChargesList } from "@/components/AdditionalChargesList";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -19,6 +21,7 @@ import { routineBookingService } from "@/services/routineBookingService";
 import { authService } from "@/services/authService";
 import { googleCalendarService } from "@/services/googleCalendarService";
 import { disputeService } from "@/services/disputeService";
+import { additionalChargeService } from "@/services/additionalChargeService";
 import { getEvidenceStatusSummary, getContractEvidencePhotos, type EvidenceStatusSummary, type EvidencePhoto } from "@/services/evidencePhotoService";
 import { hasUserSubmittedReview, areBothReviewsSubmitted } from "@/services/reviewService";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +29,10 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type Contract = Tables<"contracts">;
 type RoutineBooking = Tables<"routine_bookings">;
+type AdditionalCharge = Tables<"additional_charges"> & {
+  provider?: { full_name: string | null; email: string | null } | null;
+  client?: { full_name: string | null; email: string | null } | null;
+};
 
 type ExtendedContract = Contract & {
   project?: { title: string; location: string; booking_type?: string | null } | null;
@@ -40,6 +47,7 @@ export default function Contracts() {
   const [routineBookings, setRoutineBookings] = useState<{[key: string]: RoutineBooking[]}>({});
   const [evidenceStatus, setEvidenceStatus] = useState<{[key: string]: EvidenceStatusSummary}>({});
   const [evidencePhotos, setEvidencePhotos] = useState<{[key: string]: EvidencePhoto[]}>({});
+  const [additionalCharges, setAdditionalCharges] = useState<{[key: string]: AdditionalCharge[]}>({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
@@ -105,10 +113,11 @@ export default function Contracts() {
       const combined = [...(clientContracts || []), ...(providerContracts || [])] as unknown as ExtendedContract[];
       setContracts(combined);
       
-      // Load routine bookings, evidence status, and photos for each contract
+      // Load routine bookings, evidence status, photos, and additional charges for each contract
       const bookingsMap: {[key: string]: RoutineBooking[]} = {};
       const statusMap: {[key: string]: EvidenceStatusSummary} = {};
       const photosMap: {[key: string]: EvidencePhoto[]} = {};
+      const chargesMap: {[key: string]: AdditionalCharge[]} = {};
       const reviewStatusMap: {[key: string]: boolean} = {};
       const bothReviewsMap: {[key: string]: boolean} = {};
       const canDisputeCache: {[key: string]: boolean} = {};
@@ -152,11 +161,18 @@ export default function Contracts() {
             console.error("Error loading evidence data:", error);
           }
         }
+
+        // Load additional charges
+        const { data: charges } = await additionalChargeService.getContractCharges(contract.id);
+        if (charges && charges.length > 0) {
+          chargesMap[contract.id] = charges;
+        }
       }
       
       setRoutineBookings(bookingsMap);
       setEvidenceStatus(statusMap);
       setEvidencePhotos(photosMap);
+      setAdditionalCharges(chargesMap);
       setUserReviewStatus(reviewStatusMap);
       setBothReviewsSubmitted(bothReviewsMap);
       setCanDisputeCache(canDisputeCache);
@@ -460,6 +476,7 @@ export default function Contracts() {
                   const hasSubmittedReview = userReviewStatus[contract.id];
                   const bothReviews = bothReviewsSubmitted[contract.id];
                   const showReviewButton = status?.both_after_confirmed && !hasSubmittedReview && !bothReviews;
+                  const contractCharges = additionalCharges[contract.id] || [];
                   
                   return (
                     <div key={contract.id} className="space-y-4">
@@ -655,6 +672,28 @@ export default function Contracts() {
                                 Both parties must confirm their before photos before work can begin and after photos can be uploaded.
                               </AlertDescription>
                             </Alert>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Additional Charges Section */}
+                      {contract.status === "active" && (
+                        <div className="space-y-4">
+                          {isProvider && (
+                            <AdditionalChargeRequest
+                              contractId={contract.id}
+                              providerId={contract.provider_id}
+                              clientId={contract.client_id}
+                              onRequestSubmitted={loadContracts}
+                            />
+                          )}
+                          
+                          {contractCharges.length > 0 && (
+                            <AdditionalChargesList
+                              charges={contractCharges}
+                              isClient={isClient}
+                              onUpdate={loadContracts}
+                            />
                           )}
                         </div>
                       )}
