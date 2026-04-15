@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, DollarSign, MessageSquare } from "lucide-react";
+import { MapPin, DollarSign, MessageSquare, Tag } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Project = Tables<"projects">;
@@ -10,6 +10,11 @@ type Project = Tables<"projects">;
 interface ProjectCardProps {
   project: Project & {
     bid_count?: number;
+    category?: {
+      id: string;
+      name: string;
+      slug: string;
+    };
   };
 }
 
@@ -39,6 +44,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {project.status.replace("_", " ")}
           </Badge>
         </div>
+        {project.category && (
+          <div className="mt-2">
+            <Badge variant="secondary" className="text-xs">
+              <Tag className="h-3 w-3 mr-1" />
+              {project.category.name}
+            </Badge>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">

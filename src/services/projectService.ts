@@ -11,6 +11,7 @@ export const projectService = {
       .select(`
         *,
         client:profiles!projects_client_id_fkey(id, full_name, email),
+        category:categories(id, name, slug),
         bids(count)
       `)
       .order("created_at", { ascending: false });
@@ -31,6 +32,7 @@ export const projectService = {
       .select(`
         *,
         client:profiles!projects_client_id_fkey(id, full_name, email, phone, location),
+        category:categories(id, name, slug),
         bids(
           *,
           provider:profiles!bids_provider_id_fkey(id, full_name, email, phone, bio)
