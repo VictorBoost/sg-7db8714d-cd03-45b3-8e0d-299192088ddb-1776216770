@@ -15,32 +15,530 @@ export type Database = {
   }
   public: {
     Tables: {
-      profiles: {
+      bids: {
         Row: {
-          avatar_url: string | null
+          amount: number
           created_at: string | null
-          email: string | null
-          full_name: string | null
           id: string
+          message: string
+          project_id: string
+          provider_id: string
+          status: string | null
           updated_at: string | null
         }
         Insert: {
-          avatar_url?: string | null
+          amount: number
           created_at?: string | null
-          email?: string | null
-          full_name?: string | null
-          id: string
+          id?: string
+          message: string
+          project_id: string
+          provider_id: string
+          status?: string | null
           updated_at?: string | null
         }
         Update: {
-          avatar_url?: string | null
+          amount?: number
           created_at?: string | null
-          email?: string | null
-          full_name?: string | null
           id?: string
+          message?: string
+          project_id?: string
+          provider_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bids_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bids_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          slug?: string
           updated_at?: string | null
         }
         Relationships: []
+      }
+      contracts: {
+        Row: {
+          bid_id: string
+          client_id: string
+          completed_at: string | null
+          created_at: string | null
+          final_amount: number
+          id: string
+          project_id: string
+          provider_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bid_id: string
+          client_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          final_amount: number
+          id?: string
+          project_id: string
+          provider_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bid_id?: string
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          final_amount?: number
+          id?: string
+          project_id?: string
+          provider_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_bid_id_fkey"
+            columns: ["bid_id"]
+            isOneToOne: false
+            referencedRelation: "bids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          city_region: string | null
+          created_at: string | null
+          domestic_helper_verified: boolean | null
+          driver_licence_verified: boolean | null
+          email: string | null
+          first_name: string | null
+          full_name: string | null
+          gst_enabled: boolean | null
+          id: string
+          is_client: boolean | null
+          is_provider: boolean | null
+          last_name: string | null
+          location: string | null
+          phone: string | null
+          phone_number: string | null
+          updated_at: string | null
+          verification_status: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          city_region?: string | null
+          created_at?: string | null
+          domestic_helper_verified?: boolean | null
+          driver_licence_verified?: boolean | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          gst_enabled?: boolean | null
+          id: string
+          is_client?: boolean | null
+          is_provider?: boolean | null
+          last_name?: string | null
+          location?: string | null
+          phone?: string | null
+          phone_number?: string | null
+          updated_at?: string | null
+          verification_status?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          city_region?: string | null
+          created_at?: string | null
+          domestic_helper_verified?: boolean | null
+          driver_licence_verified?: boolean | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          gst_enabled?: boolean | null
+          id?: string
+          is_client?: boolean | null
+          is_provider?: boolean | null
+          last_name?: string | null
+          location?: string | null
+          phone?: string | null
+          phone_number?: string | null
+          updated_at?: string | null
+          verification_status?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          booking_type: string | null
+          budget: number
+          category_id: string | null
+          client_id: string
+          created_at: string | null
+          description: string
+          id: string
+          location: string
+          selected_days: string[] | null
+          start_date: string | null
+          status: string | null
+          subcategory_id: string | null
+          title: string
+          updated_at: string | null
+          weeks_count: number | null
+        }
+        Insert: {
+          booking_type?: string | null
+          budget: number
+          category_id?: string | null
+          client_id: string
+          created_at?: string | null
+          description: string
+          id?: string
+          location: string
+          selected_days?: string[] | null
+          start_date?: string | null
+          status?: string | null
+          subcategory_id?: string | null
+          title: string
+          updated_at?: string | null
+          weeks_count?: number | null
+        }
+        Update: {
+          booking_type?: string | null
+          budget?: number
+          category_id?: string | null
+          client_id?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          location?: string
+          selected_days?: string[] | null
+          start_date?: string | null
+          status?: string | null
+          subcategory_id?: string | null
+          title?: string
+          updated_at?: string | null
+          weeks_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_references: {
+        Row: {
+          created_at: string | null
+          full_name: string
+          id: string
+          phone_number: string
+          provider_id: string
+          relationship: string
+          subcategory_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name: string
+          id?: string
+          phone_number: string
+          provider_id: string
+          relationship: string
+          subcategory_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string
+          id?: string
+          phone_number?: string
+          provider_id?: string
+          relationship?: string
+          subcategory_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_references_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_references_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routine_bookings: {
+        Row: {
+          client_id: string
+          contract_id: string | null
+          created_at: string | null
+          day_of_week: string
+          id: string
+          project_id: string
+          provider_id: string
+          session_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          contract_id?: string | null
+          created_at?: string | null
+          day_of_week: string
+          id?: string
+          project_id: string
+          provider_id: string
+          session_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          contract_id?: string | null
+          created_at?: string | null
+          day_of_week?: string
+          id?: string
+          project_id?: string
+          provider_id?: string
+          session_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_bookings_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_bookings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_bookings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subcategories: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      verification_documents: {
+        Row: {
+          category_id: string | null
+          created_at: string | null
+          document_type: string
+          file_url: string
+          id: string
+          provider_id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          subcategory_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string | null
+          document_type: string
+          file_url: string
+          id?: string
+          provider_id: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          subcategory_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string | null
+          document_type?: string
+          file_url?: string
+          id?: string
+          provider_id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          subcategory_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_documents_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_documents_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_documents_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

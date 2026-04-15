@@ -60,13 +60,19 @@ export const verificationService = {
   },
 
   // Add reference
-  async addReference(providerId: string, subcategoryId: string, referenceData: Partial<Reference>) {
+  async addReference(
+    providerId: string, 
+    subcategoryId: string, 
+    referenceData: { full_name: string; relationship: string; phone_number: string }
+  ) {
     const { data, error } = await supabase
       .from("provider_references")
       .insert({
         provider_id: providerId,
         subcategory_id: subcategoryId,
-        ...referenceData,
+        full_name: referenceData.full_name,
+        relationship: referenceData.relationship,
+        phone_number: referenceData.phone_number,
       })
       .select()
       .single();
