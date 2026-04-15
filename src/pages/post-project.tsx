@@ -28,7 +28,7 @@ export default function PostProject() {
     e.preventDefault();
     
     // Check auth
-    const { data: session } = await authService.getSession();
+    const session = await authService.getCurrentSession();
     if (!session?.user) {
       toast({
         title: "Authentication required",
@@ -46,6 +46,8 @@ export default function PostProject() {
       budget: parseFloat(formData.budget),
       location: formData.location,
       client_id: session.user.id,
+      status: "open",
+      category: "other",
     });
 
     if (error) {

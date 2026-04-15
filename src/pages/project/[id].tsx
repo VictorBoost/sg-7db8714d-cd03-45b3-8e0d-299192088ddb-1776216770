@@ -42,7 +42,7 @@ export default function ProjectDetail() {
   }, [id]);
 
   const checkAuth = async () => {
-    const { data: session } = await authService.getSession();
+    const session = await authService.getCurrentSession();
     setUserId(session?.user?.id || null);
   };
 
@@ -54,7 +54,7 @@ export default function ProjectDetail() {
       setProject(projectData);
     }
 
-    const { data: bidsData } = await bidService.getBidsForProject(id as string);
+    const { data: bidsData } = await bidService.getProjectBids(id as string);
     if (bidsData) {
       setBids(bidsData);
     }
@@ -81,6 +81,7 @@ export default function ProjectDetail() {
       provider_id: userId,
       amount: parseFloat(bidForm.amount),
       message: bidForm.message,
+      status: "pending",
     });
 
     if (error) {
@@ -104,7 +105,9 @@ export default function ProjectDetail() {
   const handleAcceptBid = async (bidId: string) => {
     setAccepting(bidId);
     
-    const { data, error } = await bidService.acceptBid(bidId);
+    if (!project) return;
+
+    const { data, error } = await bidService.acceptBid(bidId, project.id, project.client_id);
     
     if (error) {
       toast({

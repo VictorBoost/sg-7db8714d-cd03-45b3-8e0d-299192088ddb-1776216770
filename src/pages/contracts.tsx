@@ -27,13 +27,15 @@ export default function Contracts() {
   const loadContracts = async () => {
     setLoading(true);
     
-    const { data: session } = await authService.getSession();
+    const session = await authService.getCurrentSession();
     if (session?.user) {
       setUserId(session.user.id);
-      const { data } = await contractService.getContractsForUser(session.user.id);
-      if (data) {
-        setContracts(data);
-      }
+      
+      const { data: clientContracts } = await contractService.getUserContracts(session.user.id, "client");
+      const { data: providerContracts } = await contractService.getUserContracts(session.user.id, "provider");
+      
+      const combined = [...(clientContracts || []), ...(providerContracts || [])];
+      setContracts(combined);
     }
     
     setLoading(false);
