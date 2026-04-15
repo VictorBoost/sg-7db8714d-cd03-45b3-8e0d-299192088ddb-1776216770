@@ -11,7 +11,18 @@ export const bidService = {
       .insert(bid)
       .select(`
         *,
-        provider:profiles!bids_provider_id_fkey(id, full_name, email, phone, bio)
+        profiles!bids_provider_id_fkey(
+          id,
+          full_name,
+          email,
+          phone,
+          bio,
+          average_rating,
+          total_reviews,
+          response_rate,
+          commission_tier,
+          verification_status
+        )
       `)
       .single();
 
@@ -38,7 +49,18 @@ export const bidService = {
       .from("bids")
       .select(`
         *,
-        provider:profiles!bids_provider_id_fkey(id, full_name, email, phone, bio)
+        profiles!bids_provider_id_fkey(
+          id,
+          full_name,
+          email,
+          phone,
+          bio,
+          average_rating,
+          total_reviews,
+          response_rate,
+          commission_tier,
+          verification_status
+        )
       `)
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
@@ -71,17 +93,39 @@ export const bidService = {
   },
 
   async acceptBid(bidId: string, projectId: string, clientId: string) {
-    // First, update the bid status
-    const { data: bidData, error: bidError } = await supabase
+    // Get the bid details first
+    const { data: bidData, error: bidFetchError } = await supabase
       .from("bids")
-      .update({ status: "accepted" })
+      .select("*, profiles!bids_provider_id_fkey(email, full_name)")
       .eq("id", bidId)
-      .select()
       .single();
 
-    if (bidError) {
-      console.error("Bid acceptance error:", bidError);
-      return { data: null, error: bidError };
+    if (bidFetchError) {
+      console.error("Bid fetch error:", bidFetchError);
+      return { data: null, error: bidFetchError };
+    }
+
+    // Update the accepted bid
+    const { error: acceptError } = await supabase
+      .from("bids")
+      .update({ status: "accepted" })
+      .eq("id", bidId);
+
+    if (acceptError) {
+      console.error("Bid acceptance error:", acceptError);
+      return { data: null, error: acceptError };
+    }
+
+    // Auto-decline all other pending bids for this project
+    const { error: declineError } = await supabase
+      .from("bids")
+      .update({ status: "rejected" })
+      .eq("project_id", projectId)
+      .neq("id", bidId)
+      .eq("status", "pending");
+
+    if (declineError) {
+      console.error("Auto-decline error:", declineError);
     }
 
     // Create the contract

@@ -15,7 +15,9 @@ import { authService } from "@/services/authService";
 import { projectService } from "@/services/projectService";
 import { bidService } from "@/services/bidService";
 import { BidCard } from "@/components/BidCard";
-import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Video as VideoIcon, RefreshCw, Upload, FileText, Shield } from "lucide-react";
+import { ProviderProfileModal } from "@/components/ProviderProfileModal";
+import { AcceptBidModal } from "@/components/AcceptBidModal";
+import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Video as VideoIcon, RefreshCw, FileText, Shield } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -31,6 +33,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [accepting, setAccepting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isProvider, setIsProvider] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
@@ -40,6 +43,10 @@ export default function ProjectDetail() {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [tradeCertFile, setTradeCertFile] = useState<File | null>(null);
   const [uploadingCert, setUploadingCert] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<any>(null);
+  const [providerModalOpen, setProviderModalOpen] = useState(false);
+  const [acceptBidModalOpen, setAcceptBidModalOpen] = useState(false);
+  const [bidToAccept, setBidToAccept] = useState<any>(null);
   const [bidData, setBidData] = useState({
     amount: "",
     estimated_timeline: "",
@@ -126,6 +133,77 @@ export default function ProjectDetail() {
     setLoading(false);
   };
 
+  const handleViewProvider = async (providerId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(`
+        *,
+        reviews!reviews_provider_id_fkey(
+          id,
+          rating,
+          comment,
+          is_public,
+          created_at
+        ),
+        provider_categories!provider_categories_provider_id_fkey(
+          categories!provider_categories_category_id_fkey(name)
+        ),
+        trade_certificates!trade_certificates_provider_id_fkey(
+          certificate_type,
+          document_url
+        )
+      `)
+      .eq("id", providerId)
+      .single();
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load provider profile",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedProvider(data);
+    setProviderModalOpen(true);
+  };
+
+  const handleAcceptBidClick = (bid: any) => {
+    setBidToAccept(bid);
+    setAcceptBidModalOpen(true);
+  };
+
+  const handleConfirmAcceptBid = async () => {
+    if (!bidToAccept || !project || !currentUser) return;
+
+    setAccepting(true);
+    setAcceptBidModalOpen(false);
+
+    const { data, error } = await bidService.acceptBid(
+      bidToAccept.id,
+      project.id,
+      currentUser.id
+    );
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to accept bid. Please try again.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Bid accepted! A contract has been created.",
+      });
+      router.push("/contracts");
+    }
+
+    setAccepting(false);
+    setBidToAccept(null);
+  };
+
   const handleReopenProject = async () => {
     if (!project) return;
     
@@ -165,7 +243,7 @@ export default function ProjectDetail() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
         title: "File too large",
@@ -220,7 +298,6 @@ export default function ProjectDetail() {
       return;
     }
 
-    // Check Domestic Helper verification for DH listings
     const isDomesticHelper = project.category?.name === "Domestic Helper";
     if (isDomesticHelper && !isDHVerified) {
       toast({
@@ -681,7 +758,14 @@ export default function ProjectDetail() {
                     ) : (
                       <div className="space-y-4">
                         {bids.map((bid: any) => (
-                          <BidCard key={bid.id} bid={bid} />
+                          <BidCard 
+                            key={bid.id} 
+                            bid={bid}
+                            isProjectOwner={isOwner}
+                            onAccept={handleAcceptBidClick}
+                            onViewProvider={handleViewProvider}
+                            accepting={accepting}
+                          />
                         ))}
                       </div>
                     )}
@@ -693,6 +777,20 @@ export default function ProjectDetail() {
         </main>
         
         <Footer />
+
+        <ProviderProfileModal
+          open={providerModalOpen}
+          onOpenChange={setProviderModalOpen}
+          provider={selectedProvider}
+        />
+
+        <AcceptBidModal
+          open={acceptBidModalOpen}
+          onOpenChange={setAcceptBidModalOpen}
+          onConfirm={handleConfirmAcceptBid}
+          providerName={bidToAccept?.profiles?.full_name || bidToAccept?.profiles?.email || "Service Provider"}
+          bidAmount={bidToAccept?.amount || 0}
+        />
       </div>
     </>
   );
