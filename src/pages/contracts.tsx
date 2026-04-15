@@ -6,12 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { EvidencePhotoUpload } from "@/components/EvidencePhotoUpload";
 import Link from "next/link";
-import { DollarSign, MapPin, Calendar, CalendarPlus, CheckCircle } from "lucide-react";
+import { DollarSign, MapPin, Calendar, CalendarPlus, CheckCircle, Camera } from "lucide-react";
 import { contractService } from "@/services/contractService";
 import { routineBookingService } from "@/services/routineBookingService";
 import { authService } from "@/services/authService";
 import { googleCalendarService } from "@/services/googleCalendarService";
+import { getEvidenceStatusSummary, type EvidenceStatusSummary } from "@/services/evidencePhotoService";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -29,11 +31,13 @@ export default function Contracts() {
   const { toast } = useToast();
   const [contracts, setContracts] = useState<ExtendedContract[]>([]);
   const [routineBookings, setRoutineBookings] = useState<{[key: string]: RoutineBooking[]}>({});
+  const [evidenceStatus, setEvidenceStatus] = useState<{[key: string]: EvidenceStatusSummary}>({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [checkingCalendar, setCheckingCalendar] = useState(true);
   const [addingToCalendar, setAddingToCalendar] = useState<{[key: string]: boolean}>({});
+  const [expandedContracts, setExpandedContracts] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     loadContracts();
@@ -82,8 +86,10 @@ export default function Contracts() {
       const combined = [...(clientContracts || []), ...(providerContracts || [])] as unknown as ExtendedContract[];
       setContracts(combined);
       
-      // Load routine bookings for each contract
+      // Load routine bookings and evidence status for each contract
       const bookingsMap: {[key: string]: RoutineBooking[]} = {};
+      const statusMap: {[key: string]: EvidenceStatusSummary} = {};
+      
       for (const contract of combined) {
         if (contract.project?.booking_type === "routine") {
           const { data: bookings } = await routineBookingService.getContractBookings(contract.id);
@@ -91,11 +97,42 @@ export default function Contracts() {
             bookingsMap[contract.id] = bookings;
           }
         }
+        
+        // Load evidence status for active contracts
+        if (contract.status === "active") {
+          try {
+            const status = await getEvidenceStatusSummary(contract.id);
+            statusMap[contract.id] = status;
+          } catch (error) {
+            console.error("Error loading evidence status:", error);
+          }
+        }
       }
+      
       setRoutineBookings(bookingsMap);
+      setEvidenceStatus(statusMap);
     }
     
     setLoading(false);
+  };
+
+  const toggleContract = (contractId: string) => {
+    setExpandedContracts(prev => ({
+      ...prev,
+      [contractId]: !prev[contractId]
+    }));
+  };
+
+  const handleEvidenceUpdate = async (contractId: string) => {
+    try {
+      const status = await getEvidenceStatusSummary(contractId);
+      setEvidenceStatus(prev => ({
+        ...prev,
+        [contractId]: status
+      }));
+    } catch (error) {
+      console.error("Error updating evidence status:", error);
+    }
   };
 
   const handleConnectCalendar = () => {
@@ -281,93 +318,153 @@ export default function Contracts() {
             <div className="grid md:grid-cols-2 gap-6">
               {contracts.map(contract => {
                 const isProvider = contract.provider_id === userId;
+                const isClient = contract.client_id === userId;
                 const hasRoutineBookings = contract.project?.booking_type === "routine" && routineBookings[contract.id]?.length > 0;
+                const status = evidenceStatus[contract.id];
+                const isExpanded = expandedContracts[contract.id];
                 
                 return (
-                  <Card key={contract.id}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl mb-1">
-                            {contract.project?.title || "Project"}
-                          </CardTitle>
-                          <CardDescription>
-                            {isProvider 
-                              ? `Client: ${contract.client?.full_name || contract.client?.email || "Client"}` 
-                              : `Provider: ${contract.provider?.full_name || contract.provider?.email || "Service Provider"}`
-                            }
-                          </CardDescription>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Badge variant="outline" className={statusColors[contract.status]}>
-                            {contract.status}
-                          </Badge>
-                          {contract.project?.booking_type === "routine" && (
-                            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                              Routine
+                  <div key={contract.id} className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <CardTitle className="text-xl mb-1">
+                              {contract.project?.title || "Project"}
+                            </CardTitle>
+                            <CardDescription>
+                              {isProvider 
+                                ? `Client: ${contract.client?.full_name || contract.client?.email || "Client"}` 
+                                : `Provider: ${contract.provider?.full_name || contract.provider?.email || "Service Provider"}`
+                              }
+                            </CardDescription>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Badge variant="outline" className={statusColors[contract.status]}>
+                              {contract.status}
                             </Badge>
+                            {contract.project?.booking_type === "routine" && (
+                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                                Routine
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4" />
+                            <span className="font-semibold text-foreground">
+                              NZD ${contract.final_amount.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            <span>{contract.project?.location || "N/A"}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{new Date(contract.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        {hasRoutineBookings && (
+                          <div className="text-sm text-muted-foreground">
+                            <p>
+                              {routineBookings[contract.id].length} sessions scheduled
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          <Button asChild variant="outline" className="flex-1">
+                            <Link href={`/project/${contract.project_id}`}>
+                              View Project
+                            </Link>
+                          </Button>
+                          
+                          {contract.status === "active" && (
+                            <>
+                              <Button
+                                onClick={() => handleAddToCalendar(contract)}
+                                disabled={isCalendarButtonDisabled(contract) || addingToCalendar[contract.id]}
+                                variant={isCalendarButtonDisabled(contract) ? "outline" : "default"}
+                                className="flex-1"
+                              >
+                                {addingToCalendar[contract.id] ? (
+                                  <>Adding...</>
+                                ) : isCalendarButtonDisabled(contract) ? (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    {getCalendarButtonText(contract)}
+                                  </>
+                                ) : (
+                                  <>
+                                    <CalendarPlus className="h-4 w-4 mr-2" />
+                                    {getCalendarButtonText(contract)}
+                                  </>
+                                )}
+                              </Button>
+                              
+                              {status && (
+                                <Button
+                                  onClick={() => toggleContract(contract.id)}
+                                  variant="outline"
+                                >
+                                  <Camera className="h-4 w-4 mr-2" />
+                                  Photos
+                                </Button>
+                              )}
+                            </>
                           )}
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4" />
-                          <span className="font-semibold text-foreground">
-                            NZD ${contract.final_amount.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          <span>{contract.project?.location || "N/A"}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{new Date(contract.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
+                      </CardContent>
+                    </Card>
 
-                      {hasRoutineBookings && (
-                        <div className="text-sm text-muted-foreground">
-                          <p>
-                            {routineBookings[contract.id].length} sessions scheduled
-                          </p>
-                        </div>
-                      )}
-                      
-                      <div className="flex gap-2">
-                        <Button asChild variant="outline" className="flex-1">
-                          <Link href={`/project/${contract.project_id}`}>
-                            View Project
-                          </Link>
-                        </Button>
+                    {/* Evidence Photos Section */}
+                    {contract.status === "active" && status && isExpanded && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Evidence Photos</h3>
                         
-                        {contract.status === "active" && (
-                          <Button
-                            onClick={() => handleAddToCalendar(contract)}
-                            disabled={isCalendarButtonDisabled(contract) || addingToCalendar[contract.id]}
-                            variant={isCalendarButtonDisabled(contract) ? "outline" : "default"}
-                            className="flex-1"
-                          >
-                            {addingToCalendar[contract.id] ? (
-                              <>Adding...</>
-                            ) : isCalendarButtonDisabled(contract) ? (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                {getCalendarButtonText(contract)}
-                              </>
-                            ) : (
-                              <>
-                                <CalendarPlus className="h-4 w-4 mr-2" />
-                                {getCalendarButtonText(contract)}
-                              </>
-                            )}
-                          </Button>
+                        {/* Before Photos */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <EvidencePhotoUpload
+                            contractId={contract.id}
+                            photoType="before"
+                            uploaderRole={isClient ? "client" : "provider"}
+                            currentPhotos={[]}
+                            currentStatus={isClient ? status.client_before : status.provider_before}
+                            otherPartyStatus={isClient ? status.provider_before : status.client_before}
+                            onUpdate={() => handleEvidenceUpdate(contract.id)}
+                          />
+                        </div>
+
+                        {/* After Photos - only show if both before photos are confirmed */}
+                        {status.both_before_confirmed && (
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <EvidencePhotoUpload
+                              contractId={contract.id}
+                              photoType="after"
+                              uploaderRole={isClient ? "client" : "provider"}
+                              currentPhotos={[]}
+                              currentStatus={isClient ? status.client_after : status.provider_after}
+                              otherPartyStatus={isClient ? status.provider_after : status.client_after}
+                              onUpdate={() => handleEvidenceUpdate(contract.id)}
+                            />
+                          </div>
+                        )}
+
+                        {!status.both_before_confirmed && (
+                          <Alert>
+                            <AlertDescription>
+                              Both parties must confirm their before photos before work can begin and after photos can be uploaded.
+                            </AlertDescription>
+                          </Alert>
                         )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 );
               })}
             </div>
