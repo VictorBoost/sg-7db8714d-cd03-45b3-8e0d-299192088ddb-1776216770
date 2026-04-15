@@ -10,7 +10,7 @@ export const contractService = {
       .from("contracts")
       .select(`
         *,
-        project:projects!contracts_project_id_fkey(id, title, description, category, location),
+        project:projects!contracts_project_id_fkey(id, title, description, category, location, booking_type),
         provider:profiles!contracts_provider_id_fkey(id, full_name, email, phone),
         client:profiles!contracts_client_id_fkey(id, full_name, email, phone)
       `)

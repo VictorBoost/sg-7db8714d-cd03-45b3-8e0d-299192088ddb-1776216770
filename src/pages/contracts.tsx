@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
-import { DollarSign, MapPin, Calendar, CalendarPlus, CheckCircle, AlertCircle } from "lucide-react";
+import { DollarSign, MapPin, Calendar, CalendarPlus, CheckCircle } from "lucide-react";
 import { contractService } from "@/services/contractService";
 import { routineBookingService } from "@/services/routineBookingService";
 import { authService } from "@/services/authService";
@@ -18,13 +18,16 @@ import type { Tables } from "@/integrations/supabase/types";
 type Contract = Tables<"contracts">;
 type RoutineBooking = Tables<"routine_bookings">;
 
+type ExtendedContract = Contract & {
+  project?: { title: string; location: string; booking_type?: string | null } | null;
+  provider?: { full_name: string | null; email: string | null } | null;
+  client?: { full_name: string | null; email: string | null } | null;
+};
+
 export default function Contracts() {
   const router = useRouter();
   const { toast } = useToast();
-  const [contracts, setContracts] = useState<(Contract & {
-    projects?: { title: string; location: string };
-    profiles?: { full_name: string | null; email: string | null };
-  })[]>([]);
+  const [contracts, setContracts] = useState<ExtendedContract[]>([]);
   const [routineBookings, setRoutineBookings] = useState<{[key: string]: RoutineBooking[]}>({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -76,13 +79,13 @@ export default function Contracts() {
       const { data: clientContracts } = await contractService.getUserContracts(session.user.id, "client");
       const { data: providerContracts } = await contractService.getUserContracts(session.user.id, "provider");
       
-      const combined = [...(clientContracts || []), ...(providerContracts || [])];
+      const combined = [...(clientContracts || []), ...(providerContracts || [])] as ExtendedContract[];
       setContracts(combined);
       
       // Load routine bookings for each contract
       const bookingsMap: {[key: string]: RoutineBooking[]} = {};
       for (const contract of combined) {
-        if (contract.projects?.booking_type === "routine") {
+        if (contract.project?.booking_type === "routine") {
           const { data: bookings } = await routineBookingService.getContractBookings(contract.id);
           if (bookings && bookings.length > 0) {
             bookingsMap[contract.id] = bookings;
@@ -100,10 +103,7 @@ export default function Contracts() {
     window.location.href = authUrl;
   };
 
-  const handleAddToCalendar = async (contract: Contract & {
-    projects?: { title: string; location: string };
-    profiles?: { full_name: string | null; email: string | null };
-  }) => {
+  const handleAddToCalendar = async (contract: ExtendedContract) => {
     if (!userId || !calendarConnected) {
       handleConnectCalendar();
       return;
@@ -114,11 +114,11 @@ export default function Contracts() {
     try {
       const isClient = contract.client_id === userId;
       const otherPartyName = isClient 
-        ? (contract.profiles?.full_name || contract.profiles?.email || "Service Provider")
-        : "Client";
+        ? (contract.provider?.full_name || contract.provider?.email || "Service Provider")
+        : (contract.client?.full_name || contract.client?.email || "Client");
 
       // For routine contracts, add all upcoming sessions
-      if (contract.projects?.booking_type === "routine") {
+      if (contract.project?.booking_type === "routine") {
         const bookings = routineBookings[contract.id] || [];
         const futureBookings = bookings.filter(b => 
           new Date(b.session_date) >= new Date() && !b.google_calendar_event_id
@@ -138,12 +138,12 @@ export default function Contracts() {
           futureBookings.map(b => ({
             id: b.id,
             session_date: b.session_date,
-            project: { title: contract.projects?.title || "Project" },
+            project: { title: contract.project?.title || "Project" },
             day_of_week: b.day_of_week,
             provider: isClient ? { full_name: otherPartyName } : undefined,
             client: isClient ? undefined : { full_name: otherPartyName },
           })),
-          contract.projects?.location || "Location TBD",
+          contract.project?.location || "Location TBD",
           isClient
         );
 
@@ -168,10 +168,10 @@ export default function Contracts() {
         const eventId = await googleCalendarService.createContractEvent(
           userId,
           contract.id,
-          contract.projects?.title || "Project",
+          contract.project?.title || "Project",
           otherPartyName,
-          contract.created_at, // Using contract creation date as placeholder
-          contract.projects?.location || "Location TBD",
+          contract.created_at, // Using contract creation date as placeholder if no start date
+          contract.project?.location || "Location TBD",
           isClient
         );
 
@@ -201,8 +201,8 @@ export default function Contracts() {
     cancelled: "bg-muted text-muted-foreground border-muted",
   };
 
-  const getCalendarButtonText = (contract: Contract & { projects?: { booking_type?: string | null } }) => {
-    if (contract.projects?.booking_type === "routine") {
+  const getCalendarButtonText = (contract: ExtendedContract) => {
+    if (contract.project?.booking_type === "routine") {
       const bookings = routineBookings[contract.id] || [];
       const futureBookings = bookings.filter(b => 
         new Date(b.session_date) >= new Date() && !b.google_calendar_event_id
@@ -218,8 +218,8 @@ export default function Contracts() {
     return contract.google_calendar_event_id ? "Added to Calendar" : "Add to Calendar";
   };
 
-  const isCalendarButtonDisabled = (contract: Contract & { projects?: { booking_type?: string | null } }) => {
-    if (contract.projects?.booking_type === "routine") {
+  const isCalendarButtonDisabled = (contract: ExtendedContract) => {
+    if (contract.project?.booking_type === "routine") {
       const bookings = routineBookings[contract.id] || [];
       const futureBookings = bookings.filter(b => 
         new Date(b.session_date) >= new Date() && !b.google_calendar_event_id
@@ -281,7 +281,7 @@ export default function Contracts() {
             <div className="grid md:grid-cols-2 gap-6">
               {contracts.map(contract => {
                 const isProvider = contract.provider_id === userId;
-                const hasRoutineBookings = contract.projects?.booking_type === "routine" && routineBookings[contract.id]?.length > 0;
+                const hasRoutineBookings = contract.project?.booking_type === "routine" && routineBookings[contract.id]?.length > 0;
                 
                 return (
                   <Card key={contract.id}>
@@ -289,17 +289,20 @@ export default function Contracts() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <CardTitle className="text-xl mb-1">
-                            {contract.projects?.title || "Project"}
+                            {contract.project?.title || "Project"}
                           </CardTitle>
                           <CardDescription>
-                            {isProvider ? "You are the service provider" : `Provider: ${contract.profiles?.full_name || contract.profiles?.email || "Service Provider"}`}
+                            {isProvider 
+                              ? `Client: ${contract.client?.full_name || contract.client?.email || "Client"}` 
+                              : `Provider: ${contract.provider?.full_name || contract.provider?.email || "Service Provider"}`
+                            }
                           </CardDescription>
                         </div>
                         <div className="flex flex-col gap-2">
                           <Badge variant="outline" className={statusColors[contract.status]}>
                             {contract.status}
                           </Badge>
-                          {contract.projects?.booking_type === "routine" && (
+                          {contract.project?.booking_type === "routine" && (
                             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                               Routine
                             </Badge>
@@ -317,7 +320,7 @@ export default function Contracts() {
                         </div>
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
-                          <span>{contract.projects?.location || "N/A"}</span>
+                          <span>{contract.project?.location || "N/A"}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
