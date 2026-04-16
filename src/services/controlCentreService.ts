@@ -31,7 +31,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .eq("status", "open");
 
     const categoryGroups = (projectsData || []).reduce((acc, p) => {
-      // @ts-ignore - Supabase type for joined table
+      // @ts-expect-error - Supabase type for joined table
       const catName = p.categories?.name || "Uncategorized";
       acc[catName] = (acc[catName] || 0) + 1;
       return acc;
@@ -96,7 +96,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .gte("created_at", firstDayOfMonth.toISOString());
 
     const tierGroups = (contractsByTier || []).reduce((acc, c) => {
-      // @ts-ignore - Supabase type for joined table
+      // @ts-expect-error - Supabase type for joined table
       const tier = c.profiles?.commission_tier || "bronze";
       acc[tier] = (acc[tier] || 0) + (Number(c.platform_fee) || 0);
       return acc;
@@ -150,7 +150,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const activeRoutineContractsCount = routineContracts?.length || 0;
     const totalMonthlyRecurringValue = (routineContracts || []).reduce(
       (sum, c) => {
-        // @ts-ignore
+        // @ts-expect-error - Supabase type for joined table
         return sum + (Number(c.contracts?.final_amount) || 0);
       },
       0
