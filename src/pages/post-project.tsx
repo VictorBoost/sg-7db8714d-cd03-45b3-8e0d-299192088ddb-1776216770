@@ -19,6 +19,8 @@ import { subcategoryService } from "@/services/subcategoryService";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertCircle, Upload, X, Video } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { SafetyBanner } from "@/components/SafetyBanner";
+import { contentSafetyService } from "@/services/contentSafetyService";
 
 const NZ_LOCATIONS = [
   "Auckland", "Wellington", "Christchurch", "Hamilton", "Tauranga",
@@ -334,6 +336,43 @@ export default function PostProject() {
       return;
     }
 
+    // Validate content safety
+    const titleCheck = contentSafetyService.checkContent(formData.title);
+    if (titleCheck.isBlocked) {
+      toast({
+        title: "Content Blocked",
+        description: titleCheck.message,
+        variant: "destructive",
+      });
+      
+      // Log bypass attempt
+      await contentSafetyService.logBypassAttempt(
+        session.user.id,
+        formData.title,
+        titleCheck.detectedPatterns,
+        "post_project_title"
+      );
+      return;
+    }
+
+    const descriptionCheck = contentSafetyService.checkContent(formData.description);
+    if (descriptionCheck.isBlocked) {
+      toast({
+        title: "Content Blocked",
+        description: descriptionCheck.message,
+        variant: "destructive",
+      });
+      
+      // Log bypass attempt
+      await contentSafetyService.logBypassAttempt(
+        session.user.id,
+        formData.description,
+        descriptionCheck.detectedPatterns,
+        "post_project_description"
+      );
+      return;
+    }
+
     setLoading(true);
     setUploadingMedia(true);
 
@@ -441,6 +480,8 @@ export default function PostProject() {
                     A 2% platform fee will be added to the agreed price at checkout. All amounts in NZD. No GST currently applies.
                   </AlertDescription>
                 </Alert>
+
+                <SafetyBanner />
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">

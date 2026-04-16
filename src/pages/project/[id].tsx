@@ -21,6 +21,8 @@ import { MapPin, DollarSign, Calendar, AlertCircle, Clock, Tag, Video as VideoIc
 import type { Tables } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { getEvidenceStatusSummary, type EvidenceStatusSummary } from "@/services/evidencePhotoService";
+import { SafetyBanner } from "@/components/SafetyBanner";
+import { contentSafetyService } from "@/services/contentSafetyService";
 
 type Project = Tables<"projects">;
 type Bid = Tables<"bids">;
@@ -319,6 +321,43 @@ export default function ProjectDetail() {
         variant: "destructive",
       });
       router.push("/provider/verify-domestic-helper");
+      return;
+    }
+
+    // Validate content safety
+    const messageCheck = contentSafetyService.checkContent(bidData.message);
+    if (messageCheck.isBlocked) {
+      toast({
+        title: "Content Blocked",
+        description: messageCheck.message,
+        variant: "destructive",
+      });
+      
+      // Log bypass attempt
+      await contentSafetyService.logBypassAttempt(
+        currentUser.id,
+        bidData.message,
+        messageCheck.detectedPatterns,
+        "bid_message"
+      );
+      return;
+    }
+
+    const timelineCheck = contentSafetyService.checkContent(bidData.estimated_timeline);
+    if (timelineCheck.isBlocked) {
+      toast({
+        title: "Content Blocked",
+        description: timelineCheck.message,
+        variant: "destructive",
+      });
+      
+      // Log bypass attempt
+      await contentSafetyService.logBypassAttempt(
+        currentUser.id,
+        bidData.estimated_timeline,
+        timelineCheck.detectedPatterns,
+        "bid_timeline"
+      );
       return;
     }
     
@@ -649,6 +688,8 @@ export default function ProjectDetail() {
                       </div>
                     </CardHeader>
                     <CardContent>
+                      <SafetyBanner />
+                      
                       <form onSubmit={handleBidSubmit} className="space-y-4">
                         <Alert className="bg-accent/5 border-accent/20">
                           <AlertCircle className="h-4 w-4" />

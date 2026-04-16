@@ -14,6 +14,7 @@ import { EvidencePhotoUpload } from "@/components/EvidencePhotoUpload";
 import { ReviewSubmissionModal } from "@/components/ReviewSubmissionModal";
 import { RoutineContractPrompt } from "@/components/RoutineContractPrompt";
 import { toast } from "@/hooks/use-toast";
+import { SafetyBanner } from "@/components/SafetyBanner";
 
 type Contract = any;
 type RoutineBooking = any;
