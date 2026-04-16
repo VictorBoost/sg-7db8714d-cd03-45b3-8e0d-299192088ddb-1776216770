@@ -113,7 +113,11 @@ export default function SettingsPage() {
         settingsService.getSetting("stripe_domestic_contribution"),
         settingsService.getSetting("stripe_international_contribution"),
         settingsService.getSetting("gst_settings"),
-        settingsService.getSetting("subscription_prices"),
+        // Fetch subscription prices from subscription_plans table
+        supabase
+          .from("subscription_plans")
+          .select("feature_key, monthly_price")
+          .eq("is_active", true),
         settingsService.getSetting("moderation_switches"),
         (categoryService as any).getAllCategories ? (categoryService as any).getAllCategories() : (categoryService as any).getCategories ? (categoryService as any).getCategories() : Promise.resolve({ data: [] }),
         emailLogService.getEmailLogs(50),
@@ -128,7 +132,39 @@ export default function SettingsPage() {
         setGstEnabled(gstData.enabled || false);
         setGstPercentage(gstData.percentage || 15);
       }
-      if (subscriptionData) setSubscriptionPrices(subscriptionData);
+      
+      // Map subscription_plans data to subscriptionPrices state
+      if (subscriptionData?.data) {
+        const priceMap: any = {
+          remove_logo: 5,
+          email_hosting: 5,
+          custom_url: 5,
+          additional_staff: 2,
+        };
+        
+        subscriptionData.data.forEach((plan: any) => {
+          const price = parseFloat(plan.monthly_price);
+          switch (plan.feature_key) {
+            case "remove_logo":
+              priceMap.remove_logo = price;
+              break;
+            case "email_hosting":
+              priceMap.email_hosting = price;
+              break;
+            case "custom_url":
+              priceMap.custom_url = price;
+              break;
+            case "staff_member":
+              priceMap.additional_staff = price;
+              break;
+          }
+        });
+        
+        setSubscriptionPrices(priceMap);
+      } else if (subscriptionData) {
+        setSubscriptionPrices(subscriptionData);
+      }
+      
       if (moderationData) setModerationSwitches(moderationData);
       setCategories(categoriesData?.data || categoriesData || []);
       setEmailLogs(emailData);
@@ -210,7 +246,29 @@ export default function SettingsPage() {
   const handleSaveSubscriptions = async () => {
     setIsSaving(true);
     try {
+      // Update subscription_plans table directly
+      await Promise.all([
+        supabase
+          .from("subscription_plans")
+          .update({ monthly_price: subscriptionPrices.remove_logo.toString() })
+          .eq("feature_key", "remove_logo"),
+        supabase
+          .from("subscription_plans")
+          .update({ monthly_price: subscriptionPrices.email_hosting.toString() })
+          .eq("feature_key", "email_hosting"),
+        supabase
+          .from("subscription_plans")
+          .update({ monthly_price: subscriptionPrices.custom_url.toString() })
+          .eq("feature_key", "custom_url"),
+        supabase
+          .from("subscription_plans")
+          .update({ monthly_price: subscriptionPrices.additional_staff.toString() })
+          .eq("feature_key", "staff_member"),
+      ]);
+
+      // Also save to platform_settings for backup
       await settingsService.updateSetting("subscription_prices", subscriptionPrices);
+      
       toast({
         title: "Saved",
         description: "Subscription prices updated successfully",
