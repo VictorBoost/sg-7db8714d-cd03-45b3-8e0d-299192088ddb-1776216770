@@ -20,6 +20,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertCircle, User, Briefcase, ArrowRight } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { TierProgressCard } from "@/components/TierProgressCard";
+import { StaffManagementCard } from "@/components/StaffManagementCard";
+import { AccountingLedgerCard } from "@/components/AccountingLedgerCard";
+import { SubscriptionsCard } from "@/components/SubscriptionsCard";
 
 type Profile = Tables<"profiles">;
 
@@ -224,6 +227,24 @@ export default function Account() {
               {/* Commission Tier Progress (only for providers) */}
               {profile?.is_provider && (
                 <TierProgressCard providerId={profile.id} />
+              )}
+
+              {/* Staff Management (only for providers) */}
+              {profile?.is_provider && (
+                <StaffManagementCard providerId={profile.id} />
+              )}
+
+              {/* Accounting Ledger (only for providers, Silver+ tier) */}
+              {profile?.is_provider && (
+                <AccountingLedgerCard 
+                  providerId={profile.id} 
+                  currentTier={profile.tier || "bronze"} 
+                />
+              )}
+
+              {/* Subscriptions (only for providers) */}
+              {profile?.is_provider && (
+                <SubscriptionsCard providerId={profile.id} />
               )}
 
               {/* Profile Information */}

@@ -1,6 +1,6 @@
 ---
 title: Staff Management
-status: todo
+status: done
 priority: high
 type: feature
 tags: [service-provider, staff, subscriptions]

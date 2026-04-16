@@ -1,6 +1,6 @@
 ---
 title: Subscriptions System
-status: todo
+status: done
 priority: high
 type: feature
 tags: [service-provider, subscriptions, stripe, billing]

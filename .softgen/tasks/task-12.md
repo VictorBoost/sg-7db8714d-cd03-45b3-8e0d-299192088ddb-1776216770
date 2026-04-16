@@ -1,6 +1,6 @@
 ---
 title: Accounting Ledger
-status: todo
+status: done
 priority: high
 type: feature
 tags: [service-provider, accounting, invoices, silver-tier]
