@@ -3,10 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Star, Award, TrendingUp, MapPin, Briefcase, FileText, Flag } from "lucide-react";
+import { Star, TrendingUp, MapPin, Briefcase, FileText, Flag } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ReportModal } from "./ReportModal";
+import { getProfileBadges } from "@/services/badgeService";
+import type { ProviderBadge as BadgeType } from "@/services/badgeService";
+import { ProviderBadge } from "./ProviderBadge";
 
 type Profile = Tables<"profiles">;
 type Review = Tables<"reviews">;
@@ -23,18 +26,27 @@ interface ProviderProfileModalProps {
 
 export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderProfileModalProps) {
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [badges, setBadges] = useState<BadgeType[]>([]);
+  const [loadingBadges, setLoadingBadges] = useState(true);
+
+  useEffect(() => {
+    if (!provider) return;
+
+    async function loadBadges() {
+      try {
+        const earnedBadges = await getProfileBadges(provider.id);
+        setBadges(earnedBadges);
+      } catch (error) {
+        console.error("Error loading badges:", error);
+      } finally {
+        setLoadingBadges(false);
+      }
+    }
+    loadBadges();
+  }, [provider]);
 
   if (!provider) return null;
 
-  const tierConfig = {
-    bronze: { name: "Bronze", icon: "🥉", color: "bg-amber-700/10 text-amber-700 border-amber-700/20" },
-    silver: { name: "Silver", icon: "🥈", color: "bg-slate-400/10 text-slate-400 border-slate-400/20" },
-    gold: { name: "Gold", icon: "🥇", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
-    platinum: { name: "Platinum", icon: "💎", color: "bg-cyan-400/10 text-cyan-400 border-cyan-400/20" },
-  };
-
-  const tier = tierConfig[provider.commission_tier as keyof typeof tierConfig] || tierConfig.bronze;
-  const isVerified = provider.verification_status === "approved";
   const rating = provider.average_rating || 0;
   const reviewCount = provider.total_reviews || 0;
   const responseRate = provider.response_rate || 0;
@@ -61,19 +73,15 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
           <div className="space-y-6 py-4">
             {/* Header Info */}
             <div>
-              <h3 className="text-xl font-semibold mb-2">{provider.full_name || "Service Provider"}</h3>
-              <div className="flex flex-wrap gap-2">
-                {isVerified && (
-                  <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                    <Award className="h-3 w-3 mr-1" />
-                    Verified
-                  </Badge>
-                )}
-                <Badge variant="outline" className={tier.color}>
-                  <span className="mr-1">{tier.icon}</span>
-                  {tier.name} Tier
-                </Badge>
-              </div>
+              <h3 className="text-xl font-semibold mb-3">{provider.full_name || "Service Provider"}</h3>
+              
+              {!loadingBadges && badges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {badges.map((badge) => (
+                    <ProviderBadge key={badge.id} badge={badge} />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Stats */}

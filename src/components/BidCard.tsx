@@ -1,8 +1,12 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User, Clock, FileText, Star, TrendingUp, Award } from "lucide-react";
+import { DollarSign, User, Clock, FileText, Star, TrendingUp } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { useEffect, useState } from "react";
+import { getBidBadges } from "@/services/badgeService";
+import type { ProviderBadge as BadgeType } from "@/services/badgeService";
+import { ProviderBadge } from "./ProviderBadge";
 
 type Bid = Tables<"bids">;
 
@@ -17,6 +21,9 @@ interface BidCardProps {
       commission_tier: string | null;
       verification_status: string | null;
     };
+    projects?: {
+      category_id: string | null;
+    };
   };
   isProjectOwner?: boolean;
   onAccept?: (bidId: string) => void;
@@ -25,21 +32,33 @@ interface BidCardProps {
 }
 
 export function BidCard({ bid, isProjectOwner, onAccept, onViewProvider, accepting }: BidCardProps) {
+  const [badges, setBadges] = useState<BadgeType[]>([]);
+  const [loadingBadges, setLoadingBadges] = useState(true);
+
+  useEffect(() => {
+    async function loadBadges() {
+      try {
+        const earnedBadges = await getBidBadges(
+          bid.provider_id,
+          bid.project_id,
+          bid.projects?.category_id || undefined
+        );
+        setBadges(earnedBadges);
+      } catch (error) {
+        console.error("Error loading badges:", error);
+      } finally {
+        setLoadingBadges(false);
+      }
+    }
+    loadBadges();
+  }, [bid.provider_id, bid.project_id, bid.projects?.category_id]);
+
   const statusColors = {
     pending: "bg-accent/10 text-accent border-accent/20",
     accepted: "bg-success/10 text-success border-success/20",
     rejected: "bg-muted text-muted-foreground border-muted",
   };
 
-  const tierConfig = {
-    bronze: { name: "Bronze", icon: "🥉", color: "bg-amber-700/10 text-amber-700 border-amber-700/20" },
-    silver: { name: "Silver", icon: "🥈", color: "bg-slate-400/10 text-slate-400 border-slate-400/20" },
-    gold: { name: "Gold", icon: "🥇", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
-    platinum: { name: "Platinum", icon: "💎", color: "bg-cyan-400/10 text-cyan-400 border-cyan-400/20" },
-  };
-
-  const tier = tierConfig[bid.profiles?.commission_tier as keyof typeof tierConfig] || tierConfig.bronze;
-  const isVerified = bid.profiles?.verification_status === "approved";
   const rating = bid.profiles?.average_rating || 0;
   const reviewCount = bid.profiles?.total_reviews || 0;
   const responseRate = bid.profiles?.response_rate || 0;
@@ -59,19 +78,17 @@ export function BidCard({ bid, isProjectOwner, onAccept, onViewProvider, accepti
                   {bid.profiles?.full_name || bid.profiles?.email || "Service Provider"}
                 </CardTitle>
               </button>
-              {isVerified && (
-                <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                  <Award className="h-3 w-3 mr-1" />
-                  Verified
-                </Badge>
-              )}
-              <Badge variant="outline" className={tier.color}>
-                <span className="mr-1">{tier.icon}</span>
-                {tier.name}
-              </Badge>
             </div>
 
-            <div className="flex items-center gap-4 mt-2 text-sm">
+            {!loadingBadges && badges.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {badges.map((badge) => (
+                  <ProviderBadge key={badge.id} badge={badge} />
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 mt-3 text-sm">
               {rating > 0 && (
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />

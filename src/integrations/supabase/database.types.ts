@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -838,6 +838,9 @@ export type Database = {
           last_name: string | null
           last_tier_calculation: string | null
           location: string | null
+          nzbn_document_url: string | null
+          nzbn_number: string | null
+          nzbn_verified: boolean | null
           phone: string | null
           phone_number: string | null
           response_rate: number | null
@@ -875,6 +878,9 @@ export type Database = {
           last_name?: string | null
           last_tier_calculation?: string | null
           location?: string | null
+          nzbn_document_url?: string | null
+          nzbn_number?: string | null
+          nzbn_verified?: boolean | null
           phone?: string | null
           phone_number?: string | null
           response_rate?: number | null
@@ -912,6 +918,9 @@ export type Database = {
           last_name?: string | null
           last_tier_calculation?: string | null
           location?: string | null
+          nzbn_document_url?: string | null
+          nzbn_number?: string | null
+          nzbn_verified?: boolean | null
           phone?: string | null
           phone_number?: string | null
           response_rate?: number | null
