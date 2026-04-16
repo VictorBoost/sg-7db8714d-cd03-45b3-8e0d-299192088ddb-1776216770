@@ -199,7 +199,7 @@ export default function Account() {
 
               {/* Commission Tier Progress (only for providers) */}
               {profile?.is_provider && (
-                <TierProgressCard />
+                <TierProgressCard providerId={profile.id} />
               )}
 
               {/* Profile Information */}
