@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Trash2, Activity, AlertTriangle, TrendingUp } from "lucide-react";
+import { Bot, Trash2, Activity, AlertTriangle, TrendingUp, Zap } from "lucide-react";
 import { botLabService } from "@/services/botLabService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,12 +16,17 @@ export default function BotLab() {
   const [isRemoving, setIsRemoving] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [automationStatus, setAutomationStatus] = useState<any>(null);
 
   const loadStats = async () => {
     setLoadingStats(true);
     try {
       const data = await botLabService.getBotStats();
       setStats(data);
+      
+      // Also load automation status
+      const status = await botLabService.getAutomationStatus();
+      setAutomationStatus(status);
     } catch (error) {
       console.error("Failed to load bot stats:", error);
     } finally {
@@ -118,6 +123,16 @@ export default function BotLab() {
               Bot accounts create realistic marketplace activity but cannot interact with real users. All bot data is clearly marked and can be batch deleted.
             </AlertDescription>
           </Alert>
+
+          {/* Automation Status Banner */}
+          {automationStatus?.isActive && (
+            <Alert className="mb-6 border-green-500 bg-green-500/10">
+              <Zap className="h-4 w-4 text-green-500" />
+              <AlertDescription className="text-green-600 dark:text-green-400">
+                ✓ Automation Active — {automationStatus.dailyBotCount} generated daily at random times. Bots automatically post listings, submit bids, accept contracts, and leave reviews.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Control Panel */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -263,7 +278,29 @@ export default function BotLab() {
           </Card>
 
           {/* Info Cards */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
+            {automationStatus && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-green-500" />
+                    Automation Schedule
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <p className="font-semibold text-green-600 dark:text-green-400">
+                    {automationStatus.schedule}
+                  </p>
+                  <p className="text-muted-foreground">{automationStatus.dailyBotCount}</p>
+                  <div className="mt-4 space-y-1">
+                    {automationStatus.actions.map((action: string, idx: number) => (
+                      <p key={idx}>✓ {action}</p>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Bot Behavior</CardTitle>
