@@ -179,7 +179,7 @@ export const aiVerificationService = {
         decision_maker: decisionMaker,
         admin_id: adminId,
         reason,
-        metadata: metadata || {},
+        metadata: (metadata || {}) as any,
       });
 
     if (error) {
