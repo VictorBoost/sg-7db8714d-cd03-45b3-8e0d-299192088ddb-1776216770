@@ -1047,6 +1047,99 @@ export async function sendSessionReminderEmail(
 }
 
 /**
+ * Send admin alert for account suspension or ban
+ */
+export async function sendAdminSuspensionAlert(
+  userName: string,
+  userEmail: string,
+  attemptCount: number,
+  suspensionType: "auto_suspended" | "permanently_banned"
+): Promise<boolean> {
+  const adminEmail = "admin@bluetika.co.nz";
+  const subject = suspensionType === "permanently_banned"
+    ? "BlueTika Admin: User Permanently Banned"
+    : "BlueTika Admin: User Auto-Suspended";
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #DC2626; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .button { display: inline-block; background: #1B4FD8; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .warning-box { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; }
+        .info-box { background: white; border: 1px solid #E5E7EB; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>⚠️ ${suspensionType === "permanently_banned" ? "User Permanently Banned" : "User Auto-Suspended"}</h1>
+        </div>
+        <div class="content">
+          <div class="warning-box">
+            <strong>Bypass Attempt Escalation:</strong> User has triggered ${suspensionType === "permanently_banned" ? "permanent ban" : "automatic suspension"} after ${attemptCount} attempts to share contact details.
+          </div>
+          
+          <div class="info-box">
+            <p><strong>User Name:</strong> ${userName}</p>
+            <p><strong>Email:</strong> ${userEmail}</p>
+            <p><strong>Total Attempts:</strong> ${attemptCount}</p>
+            <p><strong>Action Taken:</strong> ${suspensionType === "permanently_banned" ? "Permanently Banned" : "Auto-Suspended"}</p>
+          </div>
+          
+          <p><strong>What happened:</strong></p>
+          <p>The user repeatedly attempted to share personal contact information (phone numbers, emails, social media, URLs, or bank account details) in violation of platform policies.</p>
+          
+          <p><strong>Escalation Timeline:</strong></p>
+          <ul>
+            <li>1st attempt: Message blocked</li>
+            <li>2nd attempt: Warning flag added</li>
+            <li>3rd attempt: 24-hour chat suspension</li>
+            <li>4th attempt: Auto-suspended (current if applicable)</li>
+            <li>5th attempt: Permanently banned (current if applicable)</li>
+          </ul>
+          
+          ${suspensionType === "permanently_banned" ? `
+            <p><strong>Admin Actions Available:</strong></p>
+            <ul>
+              <li>Review bypass attempt logs</li>
+              <li>Confirm permanent ban is appropriate</li>
+              <li>Consider appeal if circumstances warrant</li>
+            </ul>
+          ` : `
+            <p><strong>Admin Actions Available:</strong></p>
+            <ul>
+              <li>Review bypass attempt logs</li>
+              <li>Manually lift suspension if warranted</li>
+              <li>Monitor for future violations</li>
+            </ul>
+          `}
+          
+          <a href="https://bluetika.co.nz/admin/trust-and-safety" class="button">Review User Account</a>
+          
+          <p>This is an automated security alert from the BlueTika platform.</p>
+        </div>
+        <div class="footer">
+          <p>BlueTika Admin System · bluetika.co.nz</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: adminEmail,
+    subject,
+    htmlBody
+  });
+}
+
+/**
  * Strip HTML tags for plain text fallback
  */
 function stripHtml(html: string): string {
