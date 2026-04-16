@@ -52,6 +52,16 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
   const responseRate = provider.response_rate || 0;
   const publicReviews = provider.reviews?.filter(r => r.is_public) || [];
 
+  const formatMemberSince = () => {
+    if (!provider.created_at) return null;
+    const date = new Date(provider.created_at);
+    const month = date.toLocaleString('en-US', { month: 'long' });
+    const year = date.getFullYear();
+    return `${month} ${year}`;
+  };
+
+  const memberSince = formatMemberSince();
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,7 +83,12 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
           <div className="space-y-6 py-4">
             {/* Header Info */}
             <div>
-              <h3 className="text-xl font-semibold mb-3">{provider.full_name || "Service Provider"}</h3>
+              <h3 className="text-xl font-semibold mb-1">{provider.full_name || "Service Provider"}</h3>
+              {memberSince && (
+                <p className="text-sm text-muted-foreground mb-3">
+                  Member since {memberSince}
+                </p>
+              )}
               
               {!loadingBadges && badges.length > 0 && (
                 <div className="flex flex-wrap gap-2">

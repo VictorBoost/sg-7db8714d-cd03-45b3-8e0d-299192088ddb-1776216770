@@ -20,6 +20,7 @@ interface BidCardProps {
       response_rate: number | null;
       commission_tier: string | null;
       verification_status: string | null;
+      created_at: string | null;
     };
     projects?: {
       category_id: string | null;
@@ -63,6 +64,16 @@ export function BidCard({ bid, isProjectOwner, onAccept, onViewProvider, accepti
   const reviewCount = bid.profiles?.total_reviews || 0;
   const responseRate = bid.profiles?.response_rate || 0;
 
+  const formatMemberSince = () => {
+    if (!bid.profiles?.created_at) return null;
+    const date = new Date(bid.profiles.created_at);
+    const month = date.toLocaleString('en-US', { month: 'long' });
+    const year = date.getFullYear();
+    return `${month} ${year}`;
+  };
+
+  const memberSince = formatMemberSince();
+
   return (
     <Card>
       <CardHeader>
@@ -79,6 +90,12 @@ export function BidCard({ bid, isProjectOwner, onAccept, onViewProvider, accepti
                 </CardTitle>
               </button>
             </div>
+
+            {memberSince && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Member since {memberSince}
+              </p>
+            )}
 
             {!loadingBadges && badges.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
