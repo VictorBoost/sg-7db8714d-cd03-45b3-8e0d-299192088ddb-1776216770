@@ -8,6 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DollarSign, AlertCircle } from "lucide-react";
 import { additionalChargeService } from "@/services/additionalChargeService";
 import { useToast } from "@/hooks/use-toast";
+import { SafetyBanner } from "@/components/SafetyBanner";
+import { contentSafetyService } from "@/services/contentSafetyService";
 
 interface AdditionalChargeRequestProps {
   contractId: string;
@@ -46,6 +48,25 @@ export function AdditionalChargeRequest({
         description: "Please provide a reason for the additional charge.",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Validate content safety
+    const reasonCheck = contentSafetyService.checkContent(reason);
+    if (reasonCheck.isBlocked) {
+      toast({
+        title: "Content Blocked",
+        description: reasonCheck.message,
+        variant: "destructive",
+      });
+      
+      // Log bypass attempt
+      await contentSafetyService.logBypassAttempt(
+        providerId,
+        reason,
+        reasonCheck.detectedPatterns,
+        "additional_charge_reason"
+      );
       return;
     }
 
@@ -93,6 +114,8 @@ export function AdditionalChargeRequest({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <SafetyBanner />
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <Alert>
             <AlertCircle className="h-4 w-4" />

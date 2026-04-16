@@ -10,6 +10,8 @@ import { sendAdminFundReleaseNotification, sendRoutineContractInvitation } from 
 import { areBothReviewsSubmitted } from "@/services/reviewService";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { SafetyBanner } from "@/components/SafetyBanner";
+import { contentSafetyService } from "@/services/contentSafetyService";
 
 interface ReviewSubmissionModalProps {
   isOpen: boolean;
@@ -57,6 +59,28 @@ export function ReviewSubmissionModal({
         description: "Please write at least 10 characters for your review.",
         variant: "destructive"
       });
+      return;
+    }
+
+    // Validate content safety
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const reviewCheck = contentSafetyService.checkContent(reviewText);
+    if (reviewCheck.isBlocked) {
+      toast({
+        title: "Content Blocked",
+        description: reviewCheck.message,
+        variant: "destructive",
+      });
+      
+      // Log bypass attempt
+      await contentSafetyService.logBypassAttempt(
+        user.id,
+        reviewText,
+        reviewCheck.detectedPatterns,
+        "review_submission"
+      );
       return;
     }
 
@@ -157,6 +181,8 @@ export function ReviewSubmissionModal({
             Share your experience working with {revieweeName} on "{projectTitle}"
           </DialogDescription>
         </DialogHeader>
+
+        <SafetyBanner />
 
         <div className="space-y-6">
           {/* Star Rating */}
