@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -200,6 +200,82 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_accounts: {
+        Row: {
+          bot_type: string
+          created_at: string | null
+          generation_batch: number
+          id: string
+          is_active: boolean | null
+          profile_id: string
+        }
+        Insert: {
+          bot_type: string
+          created_at?: string | null
+          generation_batch: number
+          id?: string
+          is_active?: boolean | null
+          profile_id: string
+        }
+        Update: {
+          bot_type?: string
+          created_at?: string | null
+          generation_batch?: number
+          id?: string
+          is_active?: boolean | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_accounts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_activity_logs: {
+        Row: {
+          action_step: string
+          action_type: string
+          bot_id: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          success: boolean
+        }
+        Insert: {
+          action_step: string
+          action_type: string
+          bot_id: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          success: boolean
+        }
+        Update: {
+          action_step?: string
+          action_type?: string
+          bot_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_activity_logs_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bot_accounts"
             referencedColumns: ["id"]
           },
         ]
