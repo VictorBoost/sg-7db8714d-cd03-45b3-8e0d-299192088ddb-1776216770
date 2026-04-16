@@ -86,14 +86,15 @@ export async function updateModerationSetting(
     };
   }
 
-  const columnName = `${contentType}_auto`;
+  // Create payload dynamically but cast to any to bypass strict type checking for dynamic keys
+  const updatePayload: any = {
+    updated_at: new Date().toISOString(),
+  };
+  updatePayload[`${contentType}_auto`] = autoApprove;
   
   const { error } = await supabase
     .from("moderation_settings")
-    .update({ 
-      [columnName]: autoApprove,
-      updated_at: new Date().toISOString() 
-    })
+    .update(updatePayload)
     .eq("id", "00000000-0000-0000-0000-000000000000");
 
   console.log("Update moderation setting:", { contentType, autoApprove, error });
@@ -128,7 +129,7 @@ export async function addToModerationQueue(
       content_type: contentType,
       item_id: itemId,
       status: "pending",
-      metadata: metadata || {},
+      metadata: (metadata as any) || {},
     })
     .select("id")
     .single();
