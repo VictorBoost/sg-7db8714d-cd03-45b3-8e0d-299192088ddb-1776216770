@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Ban, Shield, Clock, UserX, CheckCircle } from "lucide-react";
+import { AlertTriangle, Ban, Shield, Clock, UserX, CheckCircle, Flag, FileCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
 import { contentSafetyService } from "@/services/contentSafetyService";
+import { getAllReports, resolveReport, reopenReport, getReportStats } from "@/services/reportService";
 
 interface BypassAttempt {
   id: string;
@@ -36,11 +37,26 @@ interface SuspendedAccount {
   is_active: boolean;
 }
 
+interface Report {
+  id: string;
+  reporter: { id: string; full_name: string | null; email: string | null };
+  reported_user: { id: string; full_name: string | null; email: string | null } | null;
+  reported_project: { id: string; title: string } | null;
+  reason: string;
+  note: string | null;
+  status: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by_user: { id: string; full_name: string | null } | null;
+}
+
 export default function TrustAndSafety() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [bypassAttempts, setBypassAttempts] = useState<BypassAttempt[]>([]);
   const [suspendedAccounts, setSuspendedAccounts] = useState<SuspendedAccount[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportStats, setReportStats] = useState({ totalReports: 0, openReports: 0, resolvedReports: 0 });
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -63,9 +79,11 @@ export default function TrustAndSafety() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [attempts, suspensions] = await Promise.all([
+      const [attempts, suspensions, allReports, stats] = await Promise.all([
         contentSafetyService.getAllBypassAttempts(),
         contentSafetyService.getAllSuspensions(),
+        getAllReports(),
+        getReportStats(),
       ]);
 
       const formattedAttempts: BypassAttempt[] = attempts.map(a => ({
@@ -82,6 +100,8 @@ export default function TrustAndSafety() {
 
       setBypassAttempts(formattedAttempts);
       setSuspendedAccounts(suspensions);
+      setReports(allReports as Report[]);
+      setReportStats(stats);
     } catch (error) {
       console.error("Error loading trust & safety data:", error);
       toast({
@@ -120,6 +140,42 @@ export default function TrustAndSafety() {
     }
   };
 
+  const handleResolveReport = async (reportId: string) => {
+    try {
+      await resolveReport(reportId);
+      toast({
+        title: "Report Resolved",
+        description: "The report has been marked as resolved.",
+      });
+      await loadData();
+    } catch (error) {
+      console.error("Error resolving report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to resolve report",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReopenReport = async (reportId: string) => {
+    try {
+      await reopenReport(reportId);
+      toast({
+        title: "Report Reopened",
+        description: "The report has been reopened for review.",
+      });
+      await loadData();
+    } catch (error) {
+      console.error("Error reopening report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reopen report",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString("en-NZ", {
       year: "numeric",
@@ -143,6 +199,19 @@ export default function TrustAndSafety() {
     }
   };
 
+  const getReasonBadge = (reason: string) => {
+    switch (reason) {
+      case "spam":
+        return <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-600">Spam</Badge>;
+      case "fake":
+        return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-600">Fake</Badge>;
+      case "other":
+        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-600">Other</Badge>;
+      default:
+        return <Badge variant="outline">{reason}</Badge>;
+    }
+  };
+
   if (!isAdmin) {
     return null;
   }
@@ -158,7 +227,7 @@ export default function TrustAndSafety() {
               Trust and Safety
             </h1>
             <p className="text-muted-foreground">
-              Monitor bypass attempts, manage suspended accounts, and maintain platform integrity
+              Monitor bypass attempts, manage suspended accounts, review user reports, and maintain platform integrity
             </p>
           </div>
 
@@ -169,8 +238,12 @@ export default function TrustAndSafety() {
             </AlertDescription>
           </Alert>
 
-          <Tabs defaultValue="attempts" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs defaultValue="reports" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="reports" className="flex items-center gap-2">
+                <Flag className="w-4 h-4" />
+                Reports ({reportStats.openReports})
+              </TabsTrigger>
               <TabsTrigger value="attempts" className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
                 Bypass Attempts ({bypassAttempts.length})
@@ -180,6 +253,112 @@ export default function TrustAndSafety() {
                 Suspended Accounts ({suspendedAccounts.filter(s => s.is_active).length})
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="reports">
+              <Card>
+                <CardHeader>
+                  <CardTitle>User Reports</CardTitle>
+                  <CardDescription>
+                    Community-submitted reports of spam, fake listings/profiles, and other violations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <p className="text-center py-8 text-muted-foreground">Loading...</p>
+                  ) : reports.length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                      <p className="text-muted-foreground">No reports submitted yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Date & Time</TableHead>
+                            <TableHead>Reporter</TableHead>
+                            <TableHead>Target</TableHead>
+                            <TableHead>Reason</TableHead>
+                            <TableHead>Note</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reports.map((report) => (
+                            <TableRow key={report.id} className={report.status === "resolved" ? "opacity-50" : ""}>
+                              <TableCell>
+                                {report.status === "open" ? (
+                                  <Badge variant="destructive">Open</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-600">
+                                    <FileCheck className="w-3 h-3 mr-1" />
+                                    Resolved
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">
+                                {formatDate(report.created_at)}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{report.reporter.full_name || "Anonymous"}</p>
+                                  <p className="text-xs text-muted-foreground">{report.reporter.email}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {report.reported_user ? (
+                                  <div>
+                                    <Badge variant="outline" className="mb-1">User</Badge>
+                                    <p className="text-sm font-medium">{report.reported_user.full_name || "Unknown"}</p>
+                                    <p className="text-xs text-muted-foreground">{report.reported_user.email}</p>
+                                  </div>
+                                ) : report.reported_project ? (
+                                  <div>
+                                    <Badge variant="outline" className="mb-1">Project</Badge>
+                                    <p className="text-sm">{report.reported_project.title}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {getReasonBadge(report.reason)}
+                              </TableCell>
+                              <TableCell className="max-w-xs">
+                                {report.note ? (
+                                  <p className="text-sm">{report.note}</p>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {report.status === "open" ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleResolveReport(report.id)}
+                                  >
+                                    Resolve
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleReopenReport(report.id)}
+                                  >
+                                    Reopen
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="attempts">
               <Card>
