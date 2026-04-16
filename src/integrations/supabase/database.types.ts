@@ -1025,6 +1025,7 @@ export type Database = {
           created_at: string | null
           id: string
           note: string | null
+          outcome: string | null
           reason: string
           reported_project_id: string | null
           reported_user_id: string | null
@@ -1037,6 +1038,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           note?: string | null
+          outcome?: string | null
           reason: string
           reported_project_id?: string | null
           reported_user_id?: string | null
@@ -1049,6 +1051,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           note?: string | null
+          outcome?: string | null
           reason?: string
           reported_project_id?: string | null
           reported_user_id?: string | null
@@ -1562,7 +1565,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      reporter_analytics: {
+        Row: {
+          accuracy_rate: number | null
+          actioned_reports: number | null
+          dismissed_reports: number | null
+          pending_reports: number | null
+          reporter_id: string | null
+          total_reports: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_provider_60day_sales: {

@@ -7,11 +7,22 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Ban, Shield, Clock, UserX, CheckCircle, Flag, FileCheck } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle, Ban, Shield, Clock, UserX, CheckCircle, Flag, FileCheck, TrendingUp, Trophy, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
 import { contentSafetyService } from "@/services/contentSafetyService";
-import { getAllReports, resolveReport, reopenReport, getReportStats } from "@/services/reportService";
+import { 
+  getAllReports, 
+  resolveReport, 
+  reopenReport, 
+  getReportStats,
+  getReporterLeaderboard,
+  getReporterHistory,
+  type ReporterAnalytics,
+  type ReportDetails
+} from "@/services/reportService";
 
 interface BypassAttempt {
   id: string;
@@ -45,6 +56,7 @@ interface Report {
   reason: string;
   note: string | null;
   status: string;
+  outcome: string;
   created_at: string;
   resolved_at: string | null;
   resolved_by_user: { id: string; full_name: string | null } | null;
@@ -57,6 +69,10 @@ export default function TrustAndSafety() {
   const [suspendedAccounts, setSuspendedAccounts] = useState<SuspendedAccount[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [reportStats, setReportStats] = useState({ totalReports: 0, openReports: 0, resolvedReports: 0 });
+  const [reporterLeaderboard, setReporterLeaderboard] = useState<ReporterAnalytics[]>([]);
+  const [selectedReporter, setSelectedReporter] = useState<ReporterAnalytics | null>(null);
+  const [reporterHistory, setReporterHistory] = useState<ReportDetails[]>([]);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -70,8 +86,6 @@ export default function TrustAndSafety() {
       return;
     }
 
-    // For now, any authenticated user can access admin
-    // TODO: Add proper admin role checking
     setIsAdmin(true);
     await loadData();
   };
@@ -79,11 +93,12 @@ export default function TrustAndSafety() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [attempts, suspensions, allReports, stats] = await Promise.all([
+      const [attempts, suspensions, allReports, stats, leaderboard] = await Promise.all([
         contentSafetyService.getAllBypassAttempts(),
         contentSafetyService.getAllSuspensions(),
         getAllReports(),
         getReportStats(),
+        getReporterLeaderboard(),
       ]);
 
       const formattedAttempts: BypassAttempt[] = attempts.map(a => ({
@@ -102,6 +117,7 @@ export default function TrustAndSafety() {
       setSuspendedAccounts(suspensions);
       setReports(allReports as Report[]);
       setReportStats(stats);
+      setReporterLeaderboard(leaderboard);
     } catch (error) {
       console.error("Error loading trust & safety data:", error);
       toast({
@@ -140,12 +156,12 @@ export default function TrustAndSafety() {
     }
   };
 
-  const handleResolveReport = async (reportId: string) => {
+  const handleResolveReport = async (reportId: string, outcome: "actioned" | "dismissed") => {
     try {
-      await resolveReport(reportId);
+      await resolveReport(reportId, outcome);
       toast({
         title: "Report Resolved",
-        description: "The report has been marked as resolved.",
+        description: `The report has been marked as ${outcome}.`,
       });
       await loadData();
     } catch (error) {
@@ -171,6 +187,22 @@ export default function TrustAndSafety() {
       toast({
         title: "Error",
         description: "Failed to reopen report",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewReporterHistory = async (reporter: ReporterAnalytics) => {
+    try {
+      setSelectedReporter(reporter);
+      const history = await getReporterHistory(reporter.reporter_id);
+      setReporterHistory(history);
+      setHistoryDialogOpen(true);
+    } catch (error) {
+      console.error("Error loading reporter history:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load reporter history",
         variant: "destructive",
       });
     }
@@ -212,6 +244,19 @@ export default function TrustAndSafety() {
     }
   };
 
+  const getOutcomeBadge = (outcome: string) => {
+    switch (outcome) {
+      case "actioned":
+        return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-600">Actioned</Badge>;
+      case "dismissed":
+        return <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-600">Dismissed</Badge>;
+      case "pending":
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-600">Pending</Badge>;
+      default:
+        return <Badge variant="outline">{outcome}</Badge>;
+    }
+  };
+
   if (!isAdmin) {
     return null;
   }
@@ -239,10 +284,14 @@ export default function TrustAndSafety() {
           </Alert>
 
           <Tabs defaultValue="reports" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="reports" className="flex items-center gap-2">
                 <Flag className="w-4 h-4" />
                 Reports ({reportStats.openReports})
+              </TabsTrigger>
+              <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+                <Trophy className="w-4 h-4" />
+                Reporter Analytics
               </TabsTrigger>
               <TabsTrigger value="attempts" className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
@@ -276,6 +325,7 @@ export default function TrustAndSafety() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Status</TableHead>
+                            <TableHead>Outcome</TableHead>
                             <TableHead>Date & Time</TableHead>
                             <TableHead>Reporter</TableHead>
                             <TableHead>Target</TableHead>
@@ -296,6 +346,9 @@ export default function TrustAndSafety() {
                                     Resolved
                                   </Badge>
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                {getOutcomeBadge(report.outcome)}
                               </TableCell>
                               <TableCell className="font-mono text-sm">
                                 {formatDate(report.created_at)}
@@ -334,12 +387,17 @@ export default function TrustAndSafety() {
                               </TableCell>
                               <TableCell>
                                 {report.status === "open" ? (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleResolveReport(report.id)}
-                                  >
-                                    Resolve
-                                  </Button>
+                                  <div className="flex gap-2">
+                                    <Select onValueChange={(outcome) => handleResolveReport(report.id, outcome as "actioned" | "dismissed")}>
+                                      <SelectTrigger className="w-32">
+                                        <SelectValue placeholder="Resolve..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="actioned">Actioned</SelectItem>
+                                        <SelectItem value="dismissed">Dismissed</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 ) : (
                                   <Button
                                     size="sm"
@@ -358,6 +416,124 @@ export default function TrustAndSafety() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="leaderboard">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-yellow-500" />
+                      Reporter Leaderboard
+                    </CardTitle>
+                    <CardDescription>
+                      Most active reporters with accuracy rates (actioned reports / total resolved reports)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <p className="text-center py-8 text-muted-foreground">Loading...</p>
+                    ) : reporterLeaderboard.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Flag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No reports filed yet</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Rank</TableHead>
+                              <TableHead>Reporter</TableHead>
+                              <TableHead>Total Reports</TableHead>
+                              <TableHead>Actioned</TableHead>
+                              <TableHead>Dismissed</TableHead>
+                              <TableHead>Pending</TableHead>
+                              <TableHead>Accuracy Rate</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {reporterLeaderboard.map((reporter, index) => (
+                              <TableRow key={reporter.reporter_id} className={reporter.flagged_for_review ? "bg-destructive/5" : ""}>
+                                <TableCell className="font-semibold">
+                                  {index === 0 && <Trophy className="w-4 h-4 text-yellow-500 inline mr-1" />}
+                                  {index === 1 && <Trophy className="w-4 h-4 text-gray-400 inline mr-1" />}
+                                  {index === 2 && <Trophy className="w-4 h-4 text-amber-700 inline mr-1" />}
+                                  #{index + 1}
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{reporter.reporter_name}</p>
+                                    <p className="text-xs text-muted-foreground">{reporter.reporter_email}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-semibold">{reporter.total_reports}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-600">
+                                    {reporter.actioned_reports}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-600">
+                                    {reporter.dismissed_reports}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-600">
+                                    {reporter.pending_reports}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    {reporter.accuracy_rate > 0 ? (
+                                      <>
+                                        <TrendingUp className={`w-4 h-4 ${reporter.accuracy_rate >= 70 ? "text-green-500" : reporter.accuracy_rate >= 50 ? "text-yellow-500" : "text-red-500"}`} />
+                                        <span className={`font-semibold ${reporter.accuracy_rate >= 70 ? "text-green-600" : reporter.accuracy_rate >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                                          {reporter.accuracy_rate}%
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {reporter.flagged_for_review && (
+                                    <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                                      <AlertCircle className="w-3 h-3" />
+                                      Review Required
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleViewReporterHistory(reporter)}
+                                  >
+                                    View History
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {reporterLeaderboard.filter(r => r.flagged_for_review).length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>{reporterLeaderboard.filter(r => r.flagged_for_review).length} reporter(s)</strong> have more than 5 dismissed reports and require admin review
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="attempts">
@@ -527,6 +703,96 @@ export default function TrustAndSafety() {
           </Tabs>
         </div>
       </div>
+
+      {/* Reporter History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Reporter History</DialogTitle>
+            <DialogDescription>
+              Complete report history for {selectedReporter?.reporter_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedReporter && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold">{selectedReporter.total_reports}</p>
+                    <p className="text-sm text-muted-foreground">Total Reports</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold text-green-600">{selectedReporter.actioned_reports}</p>
+                    <p className="text-sm text-muted-foreground">Actioned</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold text-gray-600">{selectedReporter.dismissed_reports}</p>
+                    <p className="text-sm text-muted-foreground">Dismissed</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-2xl font-bold">{selectedReporter.accuracy_rate}%</p>
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Note</TableHead>
+                      <TableHead>Outcome</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reporterHistory.map((report) => (
+                      <TableRow key={report.id}>
+                        <TableCell className="font-mono text-sm">
+                          {formatDate(report.created_at)}
+                        </TableCell>
+                        <TableCell>
+                          {report.reported_user ? (
+                            <div>
+                              <Badge variant="outline" className="mb-1">User</Badge>
+                              <p className="text-sm">{report.reported_user.full_name || "Unknown"}</p>
+                            </div>
+                          ) : report.reported_project ? (
+                            <div>
+                              <Badge variant="outline" className="mb-1">Project</Badge>
+                              <p className="text-sm">{report.reported_project.title}</p>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {getReasonBadge(report.reason)}
+                        </TableCell>
+                        <TableCell className="max-w-xs">
+                          {report.note || <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          {getOutcomeBadge(report.outcome)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

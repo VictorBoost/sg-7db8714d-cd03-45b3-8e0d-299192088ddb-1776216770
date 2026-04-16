@@ -15,6 +15,25 @@ export interface UserReportHistory {
   asReported: Report[];
 }
 
+export interface ReporterAnalytics {
+  reporter_id: string;
+  reporter_name: string;
+  reporter_email: string;
+  total_reports: number;
+  actioned_reports: number;
+  dismissed_reports: number;
+  pending_reports: number;
+  accuracy_rate: number;
+  flagged_for_review: boolean;
+}
+
+export interface ReportDetails extends Report {
+  reporter: { id: string; full_name: string | null; email: string | null };
+  reported_user: { id: string; full_name: string | null; email: string | null } | null;
+  reported_project: { id: string; title: string } | null;
+  resolved_by_user: { id: string; full_name: string | null } | null;
+}
+
 /**
  * Create a new report
  */
@@ -145,6 +164,31 @@ export async function resolveReport(reportId: string) {
 }
 
 /**
+ * Resolve a report with outcome tracking
+ */
+export async function resolveReport(reportId: string, outcome: "actioned" | "dismissed") {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session?.user) {
+    throw new Error("Must be logged in");
+  }
+
+  const { data, error } = await supabase
+    .from("reports")
+    .update({
+      status: "resolved",
+      outcome,
+      resolved_at: new Date().toISOString(),
+      resolved_by: session.session.user.id,
+    })
+    .eq("id", reportId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Reopen a report
  */
 export async function reopenReport(reportId: string) {
@@ -180,4 +224,63 @@ export async function getReportStats(): Promise<ReportStats> {
   };
 
   return stats;
+}
+
+/**
+ * Get reporter analytics leaderboard
+ */
+export async function getReporterLeaderboard(): Promise<ReporterAnalytics[]> {
+  const { data: analyticsData, error: analyticsError } = await supabase
+    .from("reporter_analytics")
+    .select("*")
+    .order("total_reports", { ascending: false })
+    .limit(50);
+
+  if (analyticsError) throw analyticsError;
+
+  // Get reporter profile details
+  const reporterIds = analyticsData?.map(a => a.reporter_id) || [];
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", reporterIds);
+
+  if (profilesError) throw profilesError;
+
+  const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+  return (analyticsData || []).map(analytics => {
+    const profile = profileMap.get(analytics.reporter_id);
+    return {
+      reporter_id: analytics.reporter_id,
+      reporter_name: profile?.full_name || "Unknown",
+      reporter_email: profile?.email || "Unknown",
+      total_reports: analytics.total_reports,
+      actioned_reports: analytics.actioned_reports,
+      dismissed_reports: analytics.dismissed_reports,
+      pending_reports: analytics.pending_reports,
+      accuracy_rate: analytics.accuracy_rate,
+      flagged_for_review: analytics.dismissed_reports > 5,
+    };
+  });
+}
+
+/**
+ * Get detailed report history for a specific reporter
+ */
+export async function getReporterHistory(reporterId: string): Promise<ReportDetails[]> {
+  const { data, error } = await supabase
+    .from("reports")
+    .select(`
+      *,
+      reporter:profiles!reports_reporter_id_fkey(id, full_name, email),
+      reported_user:profiles!reports_reported_user_id_fkey(id, full_name, email),
+      reported_project:projects(id, title),
+      resolved_by_user:profiles!reports_resolved_by_fkey(id, full_name)
+    `)
+    .eq("reporter_id", reporterId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data as ReportDetails[];
 }
