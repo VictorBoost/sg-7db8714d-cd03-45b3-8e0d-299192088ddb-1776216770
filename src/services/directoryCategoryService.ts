@@ -78,17 +78,12 @@ export async function deleteDirectoryCategory(
 /**
  * Reorder categories (admin only)
  */
-export async function reorderCategories(
-  categoryIds: string[]
+export async function reorderDirectoryCategories(
+  updates: { id: string; display_order: number }[]
 ): Promise<{ error: any }> {
-  const updates = categoryIds.map((id, index) => ({
-    id,
-    display_order: index,
-  }));
-
   const { error } = await supabase
     .from("directory_categories")
-    .upsert(updates);
+    .upsert(updates as any);
 
   console.log("Reorder categories:", { error });
   return { error };
