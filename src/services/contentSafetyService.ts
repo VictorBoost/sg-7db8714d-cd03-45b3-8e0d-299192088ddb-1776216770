@@ -423,4 +423,34 @@ export const contentSafetyService = {
 
     return data || [];
   },
+
+  /**
+   * Get all account suspensions (admin only)
+   */
+  async getAllSuspensions(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("account_suspensions")
+      .select(`
+        *,
+        profile:profiles(full_name, email)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching suspensions:", error);
+      return [];
+    }
+
+    return data?.map((s: any) => ({
+      id: s.id,
+      user_id: s.user_id,
+      user_name: s.profile?.full_name || "Unknown",
+      user_email: s.profile?.email || "Unknown",
+      suspension_type: s.suspension_type,
+      reason: "Platform Bypass Violation",
+      suspended_at: s.created_at,
+      suspended_until: s.suspension_ends_at,
+      is_active: s.is_active
+    })) || [];
+  },
 };
