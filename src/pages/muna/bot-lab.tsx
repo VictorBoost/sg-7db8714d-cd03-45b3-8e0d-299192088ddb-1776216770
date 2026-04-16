@@ -5,15 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Trash2, Activity, AlertTriangle, TrendingUp, Zap } from "lucide-react";
+import { Bot, Trash2, Activity, AlertTriangle, TrendingUp, Zap, Skull } from "lucide-react";
 import { botLabService } from "@/services/botLabService";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function BotLab() {
   const router = useRouter();
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [isKilling, setIsKilling] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [automationStatus, setAutomationStatus] = useState<any>(null);
@@ -88,6 +100,37 @@ export default function BotLab() {
     }
   };
 
+  const handleKillSwitch = async () => {
+    setIsKilling(true);
+    try {
+      const result = await botLabService.killSwitch();
+      
+      if (result.success) {
+        toast({
+          title: "Kill Switch Activated",
+          description: result.message || `Deleted ${result.deleted} bots and all their content`,
+        });
+      } else {
+        toast({
+          title: "Kill Switch Failed",
+          description: result.error || "An error occurred",
+          variant: "destructive"
+        });
+      }
+
+      // Reload stats
+      await loadStats();
+    } catch (error) {
+      toast({
+        title: "Kill Switch Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsKilling(false);
+    }
+  };
+
   return (
     <>
       <SEO 
@@ -135,7 +178,7 @@ export default function BotLab() {
           )}
 
           {/* Control Panel */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -178,6 +221,66 @@ export default function BotLab() {
                 >
                   {isRemoving ? "Removing..." : "Remove 50 Bots"}
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-red-500 bg-red-500/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <Skull className="w-5 h-5" />
+                  Kill Switch
+                </CardTitle>
+                <CardDescription className="text-red-600 dark:text-red-400">
+                  ⚠️ DESTRUCTIVE: Permanently deletes ALL bots and ALL their content (listings, bids, contracts, photos, reviews). This action cannot be undone.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      disabled={isKilling || (stats && stats.totalBots === 0)}
+                      variant="destructive"
+                      className="w-full bg-red-600 hover:bg-red-700"
+                      size="lg"
+                    >
+                      {isKilling ? "Deleting All..." : "KILL SWITCH"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+                        <AlertTriangle className="w-6 h-6" />
+                        Confirm Kill Switch Activation
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-3">
+                        <p className="font-semibold text-foreground">
+                          This will PERMANENTLY DELETE:
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 text-sm">
+                          <li>All {stats?.totalBots || 0} bot accounts</li>
+                          <li>All project listings posted by bots</li>
+                          <li>All bids submitted by bots</li>
+                          <li>All contracts involving bots</li>
+                          <li>All photos uploaded by bots</li>
+                          <li>All reviews left by bots</li>
+                          <li>All bot activity logs</li>
+                        </ul>
+                        <p className="font-semibold text-red-600 dark:text-red-400 mt-4">
+                          This action cannot be undone. Real user data will NOT be affected.
+                        </p>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleKillSwitch}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Yes, Delete Everything
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
           </div>

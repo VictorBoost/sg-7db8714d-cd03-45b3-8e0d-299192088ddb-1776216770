@@ -1885,6 +1885,10 @@ export type Database = {
         Args: { provider_uuid: string }
         Returns: number
       }
+      delete_bot_profiles: {
+        Args: { profile_ids: string[] }
+        Returns: undefined
+      }
       get_tier_for_sales: { Args: { sales_amount: number }; Returns: string }
       mark_expired_projects: { Args: never; Returns: undefined }
       update_provider_tier: {

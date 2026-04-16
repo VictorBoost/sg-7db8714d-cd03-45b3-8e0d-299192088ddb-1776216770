@@ -472,6 +472,78 @@ export const botLabService = {
     return results;
   },
 
+  async killSwitch() {
+    // Get ALL bot profile IDs
+    const { data: bots, error: fetchError } = await supabase
+      .from("bot_accounts")
+      .select("profile_id")
+      .eq("is_active", true);
+
+    if (fetchError) {
+      return { 
+        success: false, 
+        deleted: 0, 
+        error: fetchError.message 
+      };
+    }
+
+    if (!bots || bots.length === 0) {
+      return { 
+        success: true, 
+        deleted: 0, 
+        message: "No active bots to delete" 
+      };
+    }
+
+    const profileIds = bots.map(b => b.profile_id);
+    const totalBots = profileIds.length;
+
+    // Delete all bot profiles at once
+    // This cascades to:
+    // - All projects they created (client_id)
+    // - All bids they submitted (provider_id)
+    // - All contracts they're in (client_id, provider_id)
+    // - All reviews they left (client_id, provider_id)
+    // - All additional charges (client_id, provider_id)
+    // - All routine contracts, bookings, etc.
+    // - The bot_accounts rows themselves
+    const { error: deleteError } = await supabase.rpc("delete_bot_profiles", {
+      profile_ids: profileIds
+    });
+
+    if (deleteError) {
+      // Fallback: delete one by one if RPC doesn't exist
+      let deleted = 0;
+      const errors = [];
+      
+      for (const profileId of profileIds) {
+        try {
+          const { error } = await supabase.auth.admin.deleteUser(profileId);
+          if (!error) {
+            deleted++;
+          } else {
+            errors.push(error.message);
+          }
+        } catch (e) {
+          errors.push(e instanceof Error ? e.message : "Unknown error");
+        }
+      }
+
+      return {
+        success: deleted > 0,
+        deleted,
+        total: totalBots,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    }
+
+    return {
+      success: true,
+      deleted: totalBots,
+      message: `Successfully deleted ${totalBots} bots and all their content`
+    };
+  },
+
   async getBotStats() {
     const { data: bots, error: botsError } = await supabase
       .from("bot_accounts")
