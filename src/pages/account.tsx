@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -38,6 +39,11 @@ export default function Account() {
     bio: "",
     location: "",
   });
+  
+  const [privacySettings, setPrivacySettings] = useState({
+    show_verified_publicly: true,
+    show_credentials_to_clients: true,
+  });
 
   useEffect(() => {
     loadProfile();
@@ -58,6 +64,10 @@ export default function Account() {
         bio: data.bio || "",
         location: data.location || "",
       });
+      setPrivacySettings({
+        show_verified_publicly: data.show_verified_publicly ?? true,
+        show_credentials_to_clients: data.show_credentials_to_clients ?? true,
+      });
     }
   };
 
@@ -71,18 +81,32 @@ export default function Account() {
       return;
     }
 
-    const { error } = await profileService.updateProfile(session.user.id, formData);
+    // First update profile data
+    const { error: profileError } = await profileService.updateProfile(session.user.id, formData);
 
-    if (error) {
+    // Then update privacy settings if provider
+    let privacyError = null;
+    if (profile?.is_provider) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          show_verified_publicly: privacySettings.show_verified_publicly,
+          show_credentials_to_clients: privacySettings.show_credentials_to_clients,
+        })
+        .eq("id", session.user.id);
+      privacyError = error;
+    }
+
+    if (profileError || privacyError) {
       toast({
         title: "Error",
-        description: "Failed to update profile. Please try again.",
+        description: "Failed to update settings. Please try again.",
         variant: "destructive",
       });
     } else {
       toast({
         title: "Success",
-        description: "Profile updated successfully!",
+        description: "Settings updated successfully!",
       });
       loadProfile();
     }
@@ -209,62 +233,110 @@ export default function Account() {
                   <CardDescription>Update your personal information</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={profile?.email || ""}
-                        disabled
-                        className="bg-muted"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Email cannot be changed
-                      </p>
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={profile?.email || ""}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Email cannot be changed
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="full_name">Full Name</Label>
+                        <Input
+                          id="full_name"
+                          value={formData.full_name}
+                          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                          placeholder="John Smith"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="location">Location</Label>
+                        <Select
+                          value={formData.location}
+                          onValueChange={(value) => setFormData({ ...formData, location: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your city or region" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {NZ_LOCATIONS.map((location) => (
+                              <SelectItem key={location} value={location}>
+                                {location}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bio">Bio</Label>
+                        <Textarea
+                          id="bio"
+                          value={formData.bio}
+                          onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                          placeholder="Tell us about yourself..."
+                          rows={4}
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="full_name">Full Name</Label>
-                      <Input
-                        id="full_name"
-                        value={formData.full_name}
-                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                        placeholder="John Smith"
-                      />
-                    </div>
+                    {profile?.is_provider && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-medium">Privacy & Visibility</h3>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="text-base">Public Verification Status</Label>
+                              <p className="text-sm text-muted-foreground">
+                                Show a green verified badge on your public profile. Document details remain private.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={privacySettings.show_verified_publicly}
+                              onCheckedChange={(checked) => 
+                                setPrivacySettings(prev => ({ ...prev, show_verified_publicly: checked }))
+                              }
+                            />
+                          </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="location">Location</Label>
-                      <Select
-                        value={formData.location}
-                        onValueChange={(value) => setFormData({ ...formData, location: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your city or region" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {NZ_LOCATIONS.map((location) => (
-                            <SelectItem key={location} value={location}>
-                              {location}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="text-base">Client Verification Status</Label>
+                              <p className="text-sm text-muted-foreground">
+                                Show your verified status to clients when you bid on their projects.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={privacySettings.show_credentials_to_clients}
+                              onCheckedChange={(checked) => 
+                                setPrivacySettings(prev => ({ ...prev, show_credentials_to_clients: checked }))
+                              }
+                            />
+                          </div>
+                          
+                          <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription className="text-xs">
+                              Your actual identity documents (like your driver licence photo) are never shown to clients or the public, regardless of these settings. They are only used by BlueTika for verification.
+                            </AlertDescription>
+                          </Alert>
+                        </div>
+                      </>
+                    )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        value={formData.bio}
-                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                        placeholder="Tell us about yourself..."
-                        rows={4}
-                      />
-                    </div>
-
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 pt-4">
                       <Button type="submit" disabled={loading}>
                         {loading ? "Saving..." : "Save Changes"}
                       </Button>
