@@ -50,10 +50,11 @@ export const paymentService = {
 
     const { data: settings } = await supabase
       .from("platform_settings")
-      .select("payment_processing_percentage")
-      .single();
+      .select("setting_value")
+      .eq("setting_key", "payment_processing_percentage")
+      .maybeSingle();
 
-    const processingPercentage = settings?.payment_processing_percentage || 0;
+    const processingPercentage = parseFloat(settings?.setting_value || "0");
     const platformFeeRate = 0.02;
     const platformFee = contract.final_amount * platformFeeRate;
     const paymentProcessingFee = contract.final_amount * (processingPercentage / 100);
