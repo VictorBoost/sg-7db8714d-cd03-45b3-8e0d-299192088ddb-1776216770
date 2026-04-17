@@ -201,22 +201,47 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 }
 
-// Password verification for control centre access
-const CONTROL_CENTRE_PASSWORD = "BlueTika2026!Secure";
+// Admin email verification for control centre access
+const OWNER_EMAIL = "bluetikanz@gmail.com";
+const STAFF_EMAIL_DOMAIN = "@bluetika.co.nz";
 
-export function verifyControlCentrePassword(password: string): boolean {
-  return password === CONTROL_CENTRE_PASSWORD;
+export async function isAdminUser(): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user?.email) {
+      return false;
+    }
+
+    // Check if owner or staff member
+    return user.email === OWNER_EMAIL || user.email.endsWith(STAFF_EMAIL_DOMAIN);
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    return false;
+  }
 }
 
-export function isControlCentreAuthenticated(): boolean {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem("muna_auth") === "true";
-}
+export async function getAdminUserInfo(): Promise<{ email: string; isOwner: boolean } | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user?.email) {
+      return null;
+    }
 
-export function setControlCentreAuthenticated(): void {
-  sessionStorage.setItem("muna_auth", "true");
-}
+    const isOwner = user.email === OWNER_EMAIL;
+    const isStaff = user.email.endsWith(STAFF_EMAIL_DOMAIN);
 
-export function clearControlCentreAuthentication(): void {
-  sessionStorage.removeItem("muna_auth");
+    if (isOwner || isStaff) {
+      return {
+        email: user.email,
+        isOwner
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error getting admin info:", error);
+    return null;
+  }
 }

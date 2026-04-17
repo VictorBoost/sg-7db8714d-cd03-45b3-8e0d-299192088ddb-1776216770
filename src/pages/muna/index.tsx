@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart,
@@ -20,11 +19,10 @@ import { DollarSign, Users, AlertCircle, FileCheck, Shield, Repeat, ShieldCheck,
 import {
   getDashboardStats,
   type DashboardStats,
-  verifyControlCentrePassword,
-  isControlCentreAuthenticated,
-  setControlCentreAuthenticated,
-  clearControlCentreAuthentication,
+  isAdminUser,
+  getAdminUserInfo,
 } from "@/services/controlCentreService";
+import { authService } from "@/services/authService";
 
 const sections = [
   {
@@ -116,17 +114,44 @@ const sections = [
 export default function ControlCentre() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [adminInfo, setAdminInfo] = useState<{ email: string; isOwner: boolean } | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isControlCentreAuthenticated()) {
-      setIsAuthenticated(true);
-      loadStats();
-    }
+    checkAdminAccess();
   }, []);
+
+  const checkAdminAccess = async () => {
+    setIsLoading(true);
+    
+    // Check if user has active session
+    const session = await authService.getCurrentSession();
+    
+    if (!session) {
+      // Not logged in - redirect to login
+      router.push("/login?redirect=/muna");
+      return;
+    }
+
+    // Check if user is admin (owner or staff)
+    const isAdmin = await isAdminUser();
+    
+    if (!isAdmin) {
+      // Logged in but not admin - show access denied
+      setIsAuthenticated(false);
+      setIsLoading(false);
+      return;
+    }
+
+    // User is authenticated and is admin
+    const info = await getAdminUserInfo();
+    setAdminInfo(info);
+    setIsAuthenticated(true);
+    setIsLoading(false);
+    loadStats();
+  };
 
   const loadStats = async () => {
     setLoading(true);
@@ -140,51 +165,45 @@ export default function ControlCentre() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (verifyControlCentrePassword(password)) {
-      setControlCentreAuthenticated();
-      setIsAuthenticated(true);
-      setError("");
-      loadStats();
-    } else {
-      setError("Incorrect password");
-      setPassword("");
-    }
+  const handleLogout = async () => {
+    await authService.signOut();
+    router.push("/");
   };
 
-  const handleLogout = () => {
-    clearControlCentreAuthentication();
-    setIsAuthenticated(false);
-    setStats(null);
-    setPassword("");
-  };
-
-  if (!isAuthenticated) {
+  if (isLoading) {
     return (
       <>
         <SEO title="BlueTika Control Centre" />
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
+            <CardContent className="p-8 text-center">
+              <p className="text-muted-foreground">Verifying access...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <SEO title="Access Denied - BlueTika Control Centre" />
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-2xl text-center">BlueTika Control Centre</CardTitle>
+              <CardTitle className="text-2xl text-center text-destructive">Access Denied</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <Input
-                    type="password"
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full"
-                  />
-                  {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-                </div>
-                <Button type="submit" className="w-full">
-                  Access Control Centre
-                </Button>
-              </form>
+            <CardContent className="space-y-4">
+              <p className="text-center text-muted-foreground">
+                You do not have permission to access the Control Centre.
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                Only BlueTika owner and authorized staff members can access this area.
+              </p>
+              <Button onClick={() => router.push("/")} className="w-full">
+                Return to Home
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -202,6 +221,12 @@ export default function ControlCentre() {
             <div>
               <h1 className="text-3xl font-bold text-foreground">BlueTika Control Centre</h1>
               <p className="text-muted-foreground mt-1">Platform Overview & Management</p>
+              {adminInfo && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Logged in as: <span className="font-medium">{adminInfo.email}</span>
+                  {adminInfo.isOwner && <span className="ml-2 text-accent">(Owner)</span>}
+                </p>
+              )}
             </div>
             <div className="flex gap-4">
               <Button variant="outline" onClick={loadStats} disabled={loading}>
