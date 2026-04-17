@@ -89,24 +89,40 @@ export const botLabService = {
   },
 
   async getAutomationStatus() {
-    const { data: setting } = await supabase
+    const { data: automationSetting } = await supabase
       .from("platform_settings")
       .select("setting_value")
       .eq("setting_key", "bot_automation_enabled")
       .single();
 
-    const isEnabled = setting?.setting_value === "true";
+    const { data: paymentSetting } = await supabase
+      .from("platform_settings")
+      .select("setting_value")
+      .eq("setting_key", "bot_payments_enabled")
+      .single();
+
+    const isEnabled = automationSetting?.setting_value === "true";
+    const paymentsEnabled = paymentSetting?.setting_value === "true";
 
     return {
       isActive: isEnabled,
+      paymentsEnabled,
       schedule: "Daily at random times between 6am-10pm NZST",
       dailyBotCount: "20-30 bots per day",
-      actions: [
+      actions: paymentsEnabled ? [
         "Generate 20-30 new bot accounts",
         "Bots post 1-3 project listings",
         "Bots submit 2-5 bids on other listings", 
         "Bots accept bids and create contracts",
-        "Bots complete contracts with photos and reviews"
+        "Bots complete Stripe payments (TEST MODE)",
+        "Bots upload before/after photos",
+        "Bots leave 4-5 star reviews"
+      ] : [
+        "Generate 20-30 new bot accounts",
+        "Bots post 1-3 project listings",
+        "Bots submit 2-5 bids on other listings",
+        "❌ Bot payments disabled - no contract acceptance",
+        "❌ No contract completion or reviews"
       ]
     };
   },
@@ -122,6 +138,23 @@ export const botLabService = {
 
     if (error) {
       console.error("Failed to toggle automation:", error);
+      return false;
+    }
+
+    return true;
+  },
+
+  async toggleBotPayments(enabled: boolean): Promise<boolean> {
+    const { error } = await supabase
+      .from("platform_settings")
+      .update({ 
+        setting_value: enabled ? "true" : "false",
+        updated_at: new Date().toISOString()
+      })
+      .eq("setting_key", "bot_payments_enabled");
+
+    if (error) {
+      console.error("Failed to toggle bot payments:", error);
       return false;
     }
 

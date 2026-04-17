@@ -17,6 +17,24 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Check if bot payments are enabled
+    const { data: paymentSetting } = await supabaseClient
+      .from("platform_settings")
+      .select("setting_value")
+      .eq("setting_key", "bot_payments_enabled")
+      .single();
+
+    if (!paymentSetting || paymentSetting.setting_value !== "true") {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Bot payments disabled - bids not accepted",
+          accepted: 0 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get bot client accounts
     const { data: botClients } = await supabaseClient
       .from("bot_accounts")

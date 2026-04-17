@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Bot, Trash2, Activity, AlertTriangle, TrendingUp, Zap, Skull, Power } from "lucide-react";
+import { Bot, Trash2, Activity, AlertTriangle, TrendingUp, Zap, Skull, Power, CreditCard } from "lucide-react";
 import { botLabService } from "@/services/botLabService";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -33,6 +33,7 @@ export default function BotLab() {
   const [loadingStats, setLoadingStats] = useState(false);
   const [automationStatus, setAutomationStatus] = useState<any>(null);
   const [isTogglingAutomation, setIsTogglingAutomation] = useState(false);
+  const [isTogglingPayments, setIsTogglingPayments] = useState(false);
 
   useEffect(() => {
     checkOwnerAccess();
@@ -106,6 +107,39 @@ export default function BotLab() {
       });
     } finally {
       setIsTogglingAutomation(false);
+    }
+  };
+
+  const handleToggleBotPayments = async (enabled: boolean) => {
+    setIsTogglingPayments(true);
+    try {
+      const success = await botLabService.toggleBotPayments(enabled);
+      
+      if (success) {
+        toast({
+          title: enabled ? "Bot Payments Enabled" : "Bot Payments Disabled",
+          description: enabled 
+            ? "Bots will now complete Stripe payments and full contract flow"
+            : "Bots will only create listings and submit bids",
+        });
+        
+        // Reload status
+        await loadStats();
+      } else {
+        toast({
+          title: "Toggle Failed",
+          description: "Failed to update bot payment status",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Toggle Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTogglingPayments(false);
     }
   };
 
@@ -264,6 +298,35 @@ export default function BotLab() {
             </CardHeader>
           </Card>
 
+          {/* Bot Payment Toggle */}
+          <Card className="mb-6 border-yellow-500">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="w-6 h-6 text-yellow-500" />
+                  <div>
+                    <CardTitle>Bot Payment Testing</CardTitle>
+                    <CardDescription>
+                      {automationStatus?.paymentsEnabled 
+                        ? "Bots can complete Stripe payments (TEST MODE)" 
+                        : "Bots will only create listings and bids"}
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {automationStatus?.paymentsEnabled ? "ON" : "OFF"}
+                  </span>
+                  <Switch
+                    checked={automationStatus?.paymentsEnabled || false}
+                    onCheckedChange={handleToggleBotPayments}
+                    disabled={isTogglingPayments}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
           {/* Warning Banner */}
           <Alert className="mb-6 border-yellow-500 bg-yellow-500/10">
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -277,7 +340,10 @@ export default function BotLab() {
             <Alert className="mb-6 border-green-500 bg-green-500/10">
               <Zap className="h-4 w-4 text-green-500" />
               <AlertDescription className="text-green-600 dark:text-green-400">
-                ✓ Automation Active — {automationStatus.dailyBotCount} generated daily at random times. Bots automatically post listings, submit bids, accept contracts, and leave reviews.
+                ✓ Automation Active — {automationStatus.dailyBotCount} generated daily at random times. 
+                {automationStatus.paymentsEnabled 
+                  ? " Bots will complete full contract flow including Stripe payments (TEST MODE)."
+                  : " Bots will only create listings and submit bids (payments disabled)."}
               </AlertDescription>
             </Alert>
           )}
