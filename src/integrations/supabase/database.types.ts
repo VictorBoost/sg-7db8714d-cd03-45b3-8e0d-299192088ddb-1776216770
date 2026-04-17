@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1141,6 +1141,88 @@ export type Database = {
           project_media_auto?: boolean | null
           review_auto?: boolean | null
           trade_certificate_auto?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      monalisa_logs: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          description: string
+          id: string
+          metadata: Json | null
+          related_contract_id: string | null
+          related_project_id: string | null
+          related_user_id: string | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          description: string
+          id?: string
+          metadata?: Json | null
+          related_contract_id?: string | null
+          related_project_id?: string | null
+          related_user_id?: string | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          metadata?: Json | null
+          related_contract_id?: string | null
+          related_project_id?: string | null
+          related_user_id?: string | null
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monalisa_logs_related_contract_id_fkey"
+            columns: ["related_contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monalisa_logs_related_project_id_fkey"
+            columns: ["related_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monalisa_logs_related_user_id_fkey"
+            columns: ["related_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monalisa_settings: {
+        Row: {
+          id: string
+          is_active: boolean
+          last_check_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          last_check_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          last_check_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
