@@ -11,14 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import {
   getCommissionTiers,
   getCommissionSettings,
-  updateTierConfig,
+  updateCommissionTier,
   updateCommissionSettings,
+  type CommissionTier,
+  type CommissionSettings,
 } from "@/services/commissionService";
 import { getProfile } from "@/services/profileService";
 import type { Database } from "@/integrations/supabase/types";
-
-type CommissionTier = Database["public"]["Tables"]["commission_tiers"]["Row"];
-type CommissionSettings = Database["public"]["Tables"]["commission_settings"]["Row"];
+import { isAdminUser } from "@/services/controlCentreService";
 
 export default function CommissionSettingsPage() {
   const router = useRouter();
@@ -30,34 +30,39 @@ export default function CommissionSettingsPage() {
   const [editedSettings, setEditedSettings] = useState<Partial<CommissionSettings>>({});
 
   useEffect(() => {
-    async function checkAuth() {
-      const profile = await getProfile();
-      if (!profile || !profile.email?.endsWith("@bluetika.co.nz")) {
-        router.push("/");
-        return;
-      }
+    checkAccess();
+  }, []);
 
-      try {
-        const [tiersData, settingsData] = await Promise.all([
-          getCommissionTiers(),
-          getCommissionSettings(),
-        ]);
-        setTiers(tiersData);
-        setSettings(settingsData);
-      } catch (error) {
-        console.error("Error loading commission data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load commission settings",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
+  async function checkAccess() {
+    const isAdmin = await isAdminUser();
+    if (!isAdmin) {
+      router.push("/muna");
+      return;
     }
 
-    checkAuth();
-  }, [router, toast]);
+    await loadData();
+  }
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [tiersData, settingsData] = await Promise.all([
+        getCommissionTiers(),
+        getCommissionSettings(),
+      ]);
+      setTiers(tiersData);
+      setSettings(settingsData);
+    } catch (error) {
+      console.error("Error loading commission data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load commission settings",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const handleTierChange = (tierId: string, field: string, value: string | number) => {
     setEditedTiers({
@@ -81,7 +86,7 @@ export default function CommissionSettingsPage() {
       const updates = editedTiers[tierId];
       if (!updates || Object.keys(updates).length === 0) return;
 
-      await updateTierConfig(tierId, updates);
+      await updateCommissionTier(tierId, updates);
       
       const updatedTiers = await getCommissionTiers();
       setTiers(updatedTiers);
