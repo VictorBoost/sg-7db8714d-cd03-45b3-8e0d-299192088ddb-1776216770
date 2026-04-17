@@ -1,10 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const staffService = {
-  // Get all staff
+  // Get all staff members
   async getAllStaff(): Promise<any[]> {
     const { data, error } = await supabase
-      .from("staff" as any)
+      .from("staff")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -12,81 +12,156 @@ export const staffService = {
     return data || [];
   },
 
-  // Create staff
-  async createStaff(
+  // Invite staff member (creates Supabase auth user + staff record)
+  async inviteStaff(
     name: string,
     email: string,
-    passwordHash: string,
-    role: string,
-    createdBy: string
+    role: "verifier" | "support" | "finance" | "moderator"
   ): Promise<any> {
-    const { data, error } = await supabase
-      .from("staff" as any)
+    // Validate email domain
+    if (!email.endsWith("@bluetika.co.nz")) {
+      throw new Error("Staff email must be @bluetika.co.nz domain");
+    }
+
+    // Get current admin user
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) throw new Error("Not authenticated");
+
+    // Create Supabase auth user (sends invitation email)
+    const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(
+      email,
+      {
+        data: {
+          name,
+          role,
+          is_staff: true,
+        },
+      }
+    );
+
+    if (authError) {
+      // If user already exists, check if they're already staff
+      if (authError.message?.includes("already registered")) {
+        throw new Error("This email is already registered. They may already be a staff member.");
+      }
+      throw authError;
+    }
+
+    // Create staff record
+    const { data: staffData, error: staffError } = await supabase
+      .from("staff")
       .insert({
+        user_id: authData.user.id,
         name,
         email,
-        password_hash: passwordHash,
         role,
         is_active: true,
-        created_by: createdBy,
+        created_by: currentUser.id,
       })
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
-  },
+    if (staffError) throw staffError;
 
-  // Deactivate staff
-  async deactivateStaff(id: string): Promise<void> {
-    const { error } = await supabase
-      .from("staff" as any)
-      .update({ is_active: false })
-      .eq("id", id);
+    // Log the action
+    await this.logAction(
+      currentUser.id,
+      currentUser.email || "admin",
+      "invite_staff",
+      "staff",
+      staffData.id,
+      { name, email, role }
+    );
 
-    if (error) throw error;
+    return staffData;
   },
 
   // Update staff active status
-  async updateStaffStatus(id: string, isActive: boolean): Promise<void> {
+  async updateStaffStatus(staffId: string, isActive: boolean): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
     const { error } = await supabase
-      .from("staff" as any)
-      .update({ is_active: isActive })
-      .eq("id", id);
+      .from("staff")
+      .update({ is_active: isActive, updated_at: new Date().toISOString() })
+      .eq("id", staffId);
 
     if (error) throw error;
+
+    // Log the action
+    await this.logAction(
+      user.id,
+      user.email || "admin",
+      isActive ? "activate_staff" : "deactivate_staff",
+      "staff",
+      staffId,
+      { is_active: isActive }
+    );
   },
 
-  // Staff login
-  async authenticateStaff(email: string, passwordHash: string): Promise<any> {
+  // Update staff role
+  async updateStaffRole(staffId: string, role: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const { error } = await supabase
+      .from("staff")
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq("id", staffId);
+
+    if (error) throw error;
+
+    // Log the action
+    await this.logAction(
+      user.id,
+      user.email || "admin",
+      "update_staff_role",
+      "staff",
+      staffId,
+      { role }
+    );
+  },
+
+  // Get current staff member info (if logged in user is staff)
+  async getCurrentStaffInfo(): Promise<any | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
     const { data, error } = await supabase
-      .from("staff" as any)
+      .from("staff")
       .select("*")
-      .eq("email", email)
+      .eq("user_id", user.id)
       .eq("is_active", true)
       .single();
 
-    if (error || !data) {
-      throw new Error("Invalid credentials or account deactivated");
-    }
-
-    if ((data as any).password_hash !== passwordHash) {
-      throw new Error("Invalid credentials");
-    }
-
+    if (error) return null;
     return data;
   },
 
   // Log audit action
   async logAction(
-    staffId: string,
+    staffUserId: string,
+    staffEmail: string,
     action: string,
     recordType: string,
-    recordId: string,
+    recordId: string | null,
     details?: any
   ): Promise<void> {
-    const { error } = await supabase.from("staff_audit_logs" as any).insert({
-      staff_id: staffId,
+    // Get staff record to get staff_id
+    const { data: staffData } = await supabase
+      .from("staff")
+      .select("id, name")
+      .eq("user_id", staffUserId)
+      .single();
+
+    if (!staffData) {
+      console.warn("Staff record not found for audit log");
+      return;
+    }
+
+    const { error } = await supabase.from("staff_audit_logs").insert({
+      staff_id: staffData.id,
+      staff_name: staffData.name,
       action,
       record_type: recordType,
       record_id: recordId,
@@ -99,28 +174,49 @@ export const staffService = {
   // Get audit logs
   async getAuditLogs(limit = 100): Promise<any[]> {
     const { data, error } = await supabase
-      .from("staff_audit_logs" as any)
+      .from("staff_audit_logs")
       .select("*")
-      .order("created_at", { ascending: false })
+      .order("timestamp", { ascending: false })
       .limit(limit);
 
     if (error) throw error;
     return data || [];
   },
 
-  // Check permissions
+  // Check if user has permission for a specific action/page
   hasPermission(role: string, page: string): boolean {
     const permissions: Record<string, string[]> = {
       verifier: ["/muna/verify-providers", "/muna/verify-domestic-helpers"],
-      support: ["/muna/disputes", "/muna/reports"],
+      support: ["/muna/disputes", "/muna/trust-and-safety"],
       finance: ["/muna/fund-releases", "/muna/commission-settings"],
       moderator: [
         "/muna/trust-and-safety",
         "/muna/moderation-settings",
-        "/muna/reports",
       ],
     };
 
     return permissions[role]?.some((p) => page.startsWith(p)) || false;
+  },
+
+  // Get role display name
+  getRoleDisplayName(role: string): string {
+    const roleNames: Record<string, string> = {
+      verifier: "Verifier",
+      support: "Support Specialist",
+      finance: "Finance Manager",
+      moderator: "Content Moderator",
+    };
+    return roleNames[role] || role;
+  },
+
+  // Get role description
+  getRoleDescription(role: string): string {
+    const descriptions: Record<string, string> = {
+      verifier: "Reviews and approves provider verification requests",
+      support: "Handles disputes, reports, and user support",
+      finance: "Manages fund releases and commission reports",
+      moderator: "Reviews reports, bypass attempts, and content safety",
+    };
+    return descriptions[role] || "";
   },
 };

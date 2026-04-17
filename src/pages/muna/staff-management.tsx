@@ -10,29 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, Plus, Shield, UserX, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Users, Plus, Shield, UserX, CheckCircle, Clock, AlertTriangle, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
 import { staffService } from "@/services/staffService";
-
-interface Staff {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface AuditLog {
-  id: string;
-  staff_name: string;
-  action: string;
-  record_type: string;
-  record_id: string | null;
-  details: any;
-  timestamp: string;
-}
+import { isAdminUser } from "@/services/controlCentreService";
 
 export default function StaffManagement() {
   const router = useRouter();
@@ -40,8 +22,8 @@ export default function StaffManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: "", email: "", password: "", role: "verifier" });
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", role: "verifier" });
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -49,9 +31,9 @@ export default function StaffManagement() {
   }, []);
 
   const checkAdminAccess = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
+    const adminStatus = await isAdminUser();
+    if (!adminStatus) {
+      router.push("/muna");
       return;
     }
 
@@ -81,61 +63,45 @@ export default function StaffManagement() {
     }
   };
 
-  const handleCreateStaff = async () => {
-    if (!newStaff.name || !newStaff.email || !newStaff.password) {
+  const handleInviteStaff = async () => {
+    if (!newStaff.name || !newStaff.email) {
       toast({
         title: "Validation Error",
-        description: "All fields are required",
+        description: "Name and email are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newStaff.email.endsWith("@bluetika.co.nz")) {
+      toast({
+        title: "Invalid Email",
+        description: "Staff email must be @bluetika.co.nz domain",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const session = await supabase.auth.getSession();
-      const adminId = session.data.session?.user.id || "admin";
-      
-      await staffService.createStaff(
+      await staffService.inviteStaff(
         newStaff.name,
         newStaff.email,
-        btoa(newStaff.password), // simple base64 hash for demo
-        newStaff.role as "verifier" | "support" | "finance" | "moderator",
-        adminId
+        newStaff.role as "verifier" | "support" | "finance" | "moderator"
       );
 
       toast({
-        title: "Staff Created",
-        description: `${newStaff.name} has been added to the team.`,
+        title: "Invitation Sent",
+        description: `${newStaff.name} has been invited. They will receive an email to set up their account.`,
       });
 
-      setCreateDialogOpen(false);
-      setNewStaff({ name: "", email: "", password: "", role: "verifier" });
+      setInviteDialogOpen(false);
+      setNewStaff({ name: "", email: "", role: "verifier" });
       await loadData();
-    } catch (error) {
-      console.error("Error creating staff:", error);
+    } catch (error: any) {
+      console.error("Error inviting staff:", error);
       toast({
         title: "Error",
-        description: "Failed to create staff account",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeactivate = async (id: string) => {
-    try {
-      await staffService.deactivateStaff(id);
-      setStaffList((prev: any[]) =>
-        prev.map((s) => (s.id === id ? { ...s, is_active: false } : s))
-      );
-      toast({
-        title: "Account Deactivated",
-        description: "The staff account has been deactivated successfully.",
-      });
-    } catch (error) {
-      console.error("Error deactivating staff:", error);
-      toast({
-        title: "Error",
-        description: "Failed to deactivate staff account",
+        description: error.message || "Failed to invite staff member",
         variant: "destructive",
       });
     }
@@ -168,7 +134,7 @@ export default function StaffManagement() {
     };
     return (
       <Badge variant="outline" className={roleColors[role] || ""}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
+        {staffService.getRoleDisplayName(role)}
       </Badge>
     );
   };
@@ -199,14 +165,21 @@ export default function StaffManagement() {
                 Staff Management
               </h1>
               <p className="text-muted-foreground">
-                Create and manage staff accounts with role-based access control
+                Invite and manage staff members with role-based access control
               </p>
             </div>
-            <Button onClick={() => setCreateDialogOpen(true)} className="flex items-center gap-2">
+            <Button onClick={() => setInviteDialogOpen(true)} className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
-              Add Staff
+              Invite Staff
             </Button>
           </div>
+
+          <Alert>
+            <Mail className="h-4 w-4" />
+            <AlertDescription>
+              Staff invitations are sent via email. New staff members will receive a secure link to set up their @bluetika.co.nz account and access the Control Centre.
+            </AlertDescription>
+          </Alert>
 
           <div className="grid gap-6">
             <Card>
@@ -220,7 +193,8 @@ export default function StaffManagement() {
                 ) : staffList.length === 0 ? (
                   <div className="text-center py-12">
                     <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No staff members yet</p>
+                    <p className="text-muted-foreground mb-2">No staff members yet</p>
+                    <p className="text-sm text-muted-foreground">Invite your first staff member to get started</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -231,7 +205,7 @@ export default function StaffManagement() {
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Role</TableHead>
-                          <TableHead>Created</TableHead>
+                          <TableHead>Invited</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -324,12 +298,12 @@ export default function StaffManagement() {
         </div>
       </div>
 
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Staff Account</DialogTitle>
+            <DialogTitle>Invite Staff Member</DialogTitle>
             <DialogDescription>
-              Add a new staff member with role-based access to specific admin functions
+              Send an invitation email to add a new staff member to the Control Centre
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -343,24 +317,15 @@ export default function StaffManagement() {
               />
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email (@bluetika.co.nz)</Label>
               <Input
                 id="email"
                 type="email"
                 value={newStaff.email}
                 onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                placeholder="john@example.com"
+                placeholder="john@bluetika.co.nz"
               />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={newStaff.password}
-                onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
-                placeholder="••••••••"
-              />
+              <p className="text-xs text-muted-foreground mt-1">Must be @bluetika.co.nz domain</p>
             </div>
             <div>
               <Label htmlFor="role">Role</Label>
@@ -369,25 +334,48 @@ export default function StaffManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="verifier">Verifier (verification queue only)</SelectItem>
-                  <SelectItem value="support">Support (disputes, reports, user contact)</SelectItem>
-                  <SelectItem value="finance">Finance (fund releases, commission reports)</SelectItem>
-                  <SelectItem value="moderator">Moderator (reports, bypass attempts, suspensions)</SelectItem>
+                  <SelectItem value="verifier">
+                    <div>
+                      <div className="font-medium">Verifier</div>
+                      <div className="text-xs text-muted-foreground">Reviews provider verification requests</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="support">
+                    <div>
+                      <div className="font-medium">Support Specialist</div>
+                      <div className="text-xs text-muted-foreground">Handles disputes and user support</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="finance">
+                    <div>
+                      <div className="font-medium">Finance Manager</div>
+                      <div className="text-xs text-muted-foreground">Manages fund releases and commissions</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="moderator">
+                    <div>
+                      <div className="font-medium">Content Moderator</div>
+                      <div className="text-xs text-muted-foreground">Reviews reports and content safety</div>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                Staff will receive email with login credentials. They can log in at /muna/staff.
+                An invitation email will be sent to this address with a secure signup link. They'll be able to access the Control Centre immediately after setting their password.
               </AlertDescription>
             </Alert>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateStaff}>Create Account</Button>
+            <Button onClick={handleInviteStaff}>
+              <Mail className="w-4 h-4 mr-2" />
+              Send Invitation
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
