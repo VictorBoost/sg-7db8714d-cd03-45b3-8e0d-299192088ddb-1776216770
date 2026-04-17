@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -330,6 +330,61 @@ export type Database = {
             columns: ["bot_id"]
             isOneToOne: false
             referencedRelation: "bot_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_bypass_attempts: {
+        Row: {
+          attempt_type: string
+          bid_id: string | null
+          bot_profile_id: string | null
+          content_snippet: string
+          created_at: string | null
+          detection_status: string
+          id: string
+          project_id: string | null
+        }
+        Insert: {
+          attempt_type: string
+          bid_id?: string | null
+          bot_profile_id?: string | null
+          content_snippet: string
+          created_at?: string | null
+          detection_status: string
+          id?: string
+          project_id?: string | null
+        }
+        Update: {
+          attempt_type?: string
+          bid_id?: string | null
+          bot_profile_id?: string | null
+          content_snippet?: string
+          created_at?: string | null
+          detection_status?: string
+          id?: string
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_bypass_attempts_bid_id_fkey"
+            columns: ["bid_id"]
+            isOneToOne: false
+            referencedRelation: "bids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_bypass_attempts_bot_profile_id_fkey"
+            columns: ["bot_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_bypass_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
