@@ -413,8 +413,8 @@ export const botLabService = {
       .limit(100);
 
     const errorSummary = (errorLogs || []).reduce((acc, log) => {
-      if (log.details?.error) {
-        const key = log.action_type;
+      if (log.error_message) {
+        const key = log.action_type || "unknown";
         acc[key] = (acc[key] || 0) + 1;
       }
       return acc;
@@ -425,7 +425,7 @@ export const botLabService = {
       providerBots: providerBots || 0,
       clientBots: clientBots || 0,
       errorSummary,
-      recentErrors: errorLogs?.filter(log => log.details?.error).slice(0, 20) || []
+      recentErrors: errorLogs?.filter(log => log.error_message).slice(0, 20) || []
     };
   },
 
