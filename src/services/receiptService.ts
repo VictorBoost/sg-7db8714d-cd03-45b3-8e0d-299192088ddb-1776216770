@@ -196,19 +196,31 @@ export const receiptService = {
       
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 10px 0; color: #64748B; font-size: 14px;">Agreed Price:</td>
+          <td style="padding: 10px 0; color: #64748B; font-size: 14px;">Agreed price:</td>
           <td style="padding: 10px 0; text-align: right; font-weight: 500; color: #1E293B; font-size: 14px;">NZD $${receipt.agreedPrice.toLocaleString()}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #64748B; font-size: 14px;">Platform Fee (2%):</td>
+          <td style="padding: 10px 0; color: #64748B; font-size: 14px;">Platform fee (2%):</td>
           <td style="padding: 10px 0; text-align: right; font-weight: 500; color: #1E293B; font-size: 14px;">NZD $${receipt.platformFee.toLocaleString()}</td>
         </tr>
         <tr>
-          <td style="padding: 10px 0; color: #64748B; font-size: 14px;">Payment Processing:</td>
+          <td style="padding: 10px 0; color: #64748B; font-size: 14px;">
+            Payment processing contribution:
+            <span style="display: inline-block; background: #EEF2FF; color: #1B4FD8; width: 16px; height: 16px; border-radius: 50%; text-align: center; font-size: 11px; font-weight: 700; line-height: 16px; margin-left: 4px;">?</span>
+          </td>
           <td style="padding: 10px 0; text-align: right; font-weight: 500; color: #1E293B; font-size: 14px;">NZD $${receipt.processingFee.toLocaleString()}</td>
         </tr>
+        <tr>
+          <td colspan="2" style="padding: 5px 15px; background: #F8FAFC; border-radius: 4px;">
+            <p style="margin: 0; font-size: 12px; color: #64748B; line-height: 1.5;">
+              <strong>About payment processing:</strong> BlueTika uses Stripe for secure payments. 
+              Domestic cards: 2.65% + $0.30. International cards: 3.7% + $0.30. 
+              This small contribution keeps your payment protected.
+            </p>
+          </td>
+        </tr>
         <tr style="border-top: 2px solid #E2E8F0;">
-          <td style="padding: 15px 0 10px 0; color: #1E293B; font-size: 16px; font-weight: 700;">Total Paid:</td>
+          <td style="padding: 15px 0 10px 0; color: #1E293B; font-size: 16px; font-weight: 700;">Total:</td>
           <td style="padding: 15px 0 10px 0; text-align: right; color: #10B981; font-size: 18px; font-weight: 700;">NZD $${receipt.totalAmount.toLocaleString()}</td>
         </tr>
       </table>
