@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { SEO } from "@/components/SEO";
@@ -20,6 +20,19 @@ export default function LoginPage() {
     password: "",
   });
 
+  useEffect(() => {
+    // Check if already logged in
+    checkSession();
+  }, []);
+
+  const checkSession = async () => {
+    const session = await authService.getCurrentSession();
+    if (session) {
+      const redirect = router.query.redirect as string;
+      router.push(redirect || "/");
+    }
+  };
+
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError("");
@@ -36,19 +49,27 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    const { error: signInError } = await authService.signIn(
-      formData.email,
-      formData.password
-    );
+    try {
+      const { error: signInError } = await authService.signIn(
+        formData.email,
+        formData.password
+      );
 
-    if (signInError) {
-      setError(signInError.message || "Invalid email or password");
+      if (signInError) {
+        console.error("Sign in error:", signInError);
+        setError(signInError.message || "Invalid email or password");
+        setLoading(false);
+        return;
+      }
+
+      // Redirect to /muna if that's where they came from, otherwise homepage
+      const redirect = router.query.redirect as string;
+      router.push(redirect || "/");
+    } catch (err) {
+      console.error("Unexpected login error:", err);
+      setError("Connection error. Please check your internet connection and try again.");
       setLoading(false);
-      return;
     }
-
-    // Redirect to homepage on success
-    router.push("/");
   };
 
   return (
