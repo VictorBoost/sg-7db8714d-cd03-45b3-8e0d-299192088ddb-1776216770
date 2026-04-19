@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart,
@@ -18,12 +19,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { DollarSign, Users, AlertCircle, FileCheck, Shield, Repeat, ShieldCheck, AlertTriangle, Percent, Tag, Calendar, ShieldAlert, Settings, Bot, BrainCircuit, Play, Eye } from "lucide-react";
+import { DollarSign, Users, AlertCircle, FileCheck, Shield, Repeat, ShieldCheck, AlertTriangle, Percent, Tag, Calendar, ShieldAlert, Settings, Bot, BrainCircuit, Play, Eye, Lock } from "lucide-react";
 import {
   getDashboardStats,
   type DashboardStats,
   isAdminUser,
   getAdminUserInfo,
+  verifyControlCentrePassword,
 } from "@/services/controlCentreService";
 import { authService } from "@/services/authService";
 import { monalisaService } from "@/services/monalisaService";
@@ -117,8 +119,12 @@ const sections = [
 
 export default function ControlCentre() {
   const router = useRouter();
+  const [passwordVerified, setPasswordVerified] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [isCheckingPassword, setIsCheckingPassword] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [adminInfo, setAdminInfo] = useState<{ email: string; isOwner: boolean; role?: string } | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -132,17 +138,44 @@ export default function ControlCentre() {
   const [monalisaLoading, setMonalisaLoading] = useState(false);
 
   useEffect(() => {
-    checkAdminAccess();
+    checkPasswordVerification();
   }, []);
 
-  const checkAdminAccess = async () => {
+  useEffect(() => {
+    if (passwordVerified) {
+      checkPlatformAccess();
+    }
+  }, [passwordVerified]);
+
+  const checkPasswordVerification = () => {
+    const verified = sessionStorage.getItem("muna_password_verified");
+    if (verified === "true") {
+      setPasswordVerified(true);
+    }
+    setIsCheckingPassword(false);
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+
+    if (verifyControlCentrePassword(password)) {
+      sessionStorage.setItem("muna_password_verified", "true");
+      setPasswordVerified(true);
+    } else {
+      setPasswordError("Incorrect password");
+      setPassword("");
+    }
+  };
+
+  const checkPlatformAccess = async () => {
     setIsLoading(true);
     
-    // Check if user has active session
+    // Check if user has active BlueTika platform session
     const session = await authService.getCurrentSession();
     
     if (!session) {
-      // Not logged in - redirect to login
+      // Not logged into platform - redirect to login
       router.push("/login?redirect=/muna");
       return;
     }
@@ -207,10 +240,70 @@ export default function ControlCentre() {
   };
 
   const handleLogout = async () => {
+    sessionStorage.removeItem("muna_password_verified");
     await authService.signOut();
     router.push("/");
   };
 
+  // Password verification screen
+  if (isCheckingPassword) {
+    return (
+      <>
+        <SEO title="BlueTika Control Centre" />
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-8 text-center">
+              <p className="text-muted-foreground">Loading...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  if (!passwordVerified) {
+    return (
+      <>
+        <SEO title="BlueTika Control Centre" />
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border-2 border-primary/20">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Lock className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">BlueTika Control Centre</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Enter the Control Centre password to continue
+              </p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    autoFocus
+                  />
+                  {passwordError && (
+                    <p className="text-sm text-destructive">{passwordError}</p>
+                  )}
+                </div>
+                <Button type="submit" className="w-full">
+                  Access Control Centre
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  // Platform access verification
   if (isLoading) {
     return (
       <>
@@ -218,7 +311,7 @@ export default function ControlCentre() {
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">Verifying access...</p>
+              <p className="text-muted-foreground">Verifying platform access...</p>
             </CardContent>
           </Card>
         </div>
