@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag,
     ShieldCheck,
@@ -20,7 +20,7 @@ import {
     CheckCircle2,
     Lock
 } from 'lucide-react';
-import { supabase } from './lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function App() {
     const [user, setUser] = useState < any > (null);
