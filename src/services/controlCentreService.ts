@@ -270,3 +270,7 @@ export async function getAdminUserInfo(): Promise<{ email: string; isOwner: bool
     return null;
   }
 }
+
+export function verifyControlCentrePassword(password: string): boolean {
+  return password === "BlueTika2026!Secure";
+}
