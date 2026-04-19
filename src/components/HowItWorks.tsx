@@ -50,7 +50,6 @@ export function HowItWorks() {
         </div>
 
         <div className="grid gap-12 lg:grid-cols-2">
-          {/* For Clients */}
           <div>
             <h3 className="mb-8 text-2xl font-bold text-accent">
               For Clients
@@ -70,7 +69,6 @@ export function HowItWorks() {
             </div>
           </div>
 
-          {/* For Service Providers */}
           <div>
             <h3 className="mb-8 text-2xl font-bold text-success">
               For Service Providers

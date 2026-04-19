@@ -22,7 +22,7 @@ export function Hero() {
                 Post a Project
               </Link>
             </Button>
-            <Button size="lg" variant="outline" asChild className="gap-2 border-primary text-primary hover:bg-primary hover:text-white">
+            <Button size="lg" variant="outline" asChild className="gap-2">
               <Link href="/projects">
                 <Search className="h-5 w-5" />
                 Find Work
@@ -30,13 +30,6 @@ export function Hero() {
             </Button>
           </div>
         </div>
-      </div>
-      
-      {/* Decorative koru spiral pattern */}
-      <div className="absolute -right-20 top-20 h-64 w-64 opacity-5">
-        <svg viewBox="0 0 200 200" fill="currentColor" className="text-primary">
-          <path d="M100,100 Q120,80 140,100 Q160,120 140,140 Q120,160 100,140 Q80,120 100,100 Z" />
-        </svg>
       </div>
     </section>
   );
