@@ -21,7 +21,7 @@ interface ReceiptData {
 }
 
 export const receiptService = {
-  async generateReceipt(contractId: string): Promise<ReceiptData | null> {
+  async generateReceipt(contractId: string, baseUrl?: string): Promise<ReceiptData | null> {
     const { data: contract, error } = await supabase
       .from("contracts")
       .select(`
@@ -56,8 +56,9 @@ export const receiptService = {
       return null;
     }
 
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz";
-    const providerStripeSetupUrl = `${baseUrl}/account?stripe_setup=required`;
+    // Use provided baseUrl or detect from window, fallback to .co.nz
+    const siteUrl = baseUrl || (typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz");
+    const providerStripeSetupUrl = `${siteUrl}/account?stripe_setup=required`;
 
     return {
       contractId: contract.id,
@@ -84,8 +85,9 @@ export const receiptService = {
     };
   },
 
-  async sendClientReceipt(receipt: ReceiptData) {
-    const html = this.generateClientEmailTemplate(receipt);
+  async sendClientReceipt(receipt: ReceiptData, baseUrl?: string) {
+    const siteUrl = baseUrl || (typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz");
+    const html = this.generateClientEmailTemplate(receipt, siteUrl);
 
     const response = await fetch("/api/send-receipt-email", {
       method: "POST",
@@ -100,8 +102,9 @@ export const receiptService = {
     return response.json();
   },
 
-  async sendProviderReceipt(receipt: ReceiptData) {
-    const html = this.generateProviderEmailTemplate(receipt);
+  async sendProviderReceipt(receipt: ReceiptData, baseUrl?: string) {
+    const siteUrl = baseUrl || (typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz");
+    const html = this.generateProviderEmailTemplate(receipt, siteUrl);
 
     const response = await fetch("/api/send-receipt-email", {
       method: "POST",
@@ -118,7 +121,7 @@ export const receiptService = {
     return response.json();
   },
 
-  generateClientEmailTemplate(receipt: ReceiptData): string {
+  generateClientEmailTemplate(receipt: ReceiptData, baseUrl: string): string {
     const scheduledDate = receipt.projectDate 
       ? new Date(receipt.projectDate).toLocaleDateString("en-NZ", {
           weekday: "long",
@@ -279,7 +282,7 @@ export const receiptService = {
     <!-- Terms Reminder -->
     <div style="margin: 25px 0; padding: 15px; background: #F8FAFC; border-radius: 4px;">
       <p style="margin: 0; font-size: 13px; color: #64748B; line-height: 1.6;">
-        By using BlueTika, you agree to our <a href="https://bluetika.co.nz/terms" style="color: #1B4FD8; text-decoration: none;">Terms & Conditions</a>. 
+        By using BlueTika, you agree to our <a href="${baseUrl}/terms" style="color: #1B4FD8; text-decoration: none;">Terms & Conditions</a>. 
         Your payment is protected under our escrow system. Funds are only released after work completion, photo submission, and mutual reviews. 
         If a dispute arises, BlueTika will mediate fairly.
       </p>
@@ -287,7 +290,7 @@ export const receiptService = {
 
     <!-- CTA Button -->
     <div style="text-align: center; margin: 30px 0;">
-      <a href="https://bluetika.co.nz/contracts" style="display: inline-block; background: #1B4FD8; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">View Contract Details</a>
+      <a href="${baseUrl}/contracts" style="display: inline-block; background: #1B4FD8; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">View Contract Details</a>
     </div>
 
   </div>
@@ -296,14 +299,14 @@ export const receiptService = {
   <div style="text-align: center; padding: 30px 20px; color: #64748B; font-size: 13px;">
     <p style="margin: 0 0 10px 0;">Questions? Contact us at <a href="mailto:support@bluetika.co.nz" style="color: #1B4FD8; text-decoration: none;">support@bluetika.co.nz</a></p>
     <p style="margin: 0 0 10px 0;">100% NZ Owned · Kiwis Helping Kiwis</p>
-    <p style="margin: 0;"><a href="https://bluetika.co.nz" style="color: #1B4FD8; text-decoration: none;">bluetika.co.nz</a></p>
+    <p style="margin: 0;"><a href="${baseUrl}" style="color: #1B4FD8; text-decoration: none;">${baseUrl.replace('https://', '')}</a></p>
   </div>
 </body>
 </html>
     `.trim();
   },
 
-  generateProviderEmailTemplate(receipt: ReceiptData): string {
+  generateProviderEmailTemplate(receipt: ReceiptData, baseUrl: string): string {
     const scheduledDate = receipt.projectDate 
       ? new Date(receipt.projectDate).toLocaleDateString("en-NZ", {
           weekday: "long",
@@ -478,7 +481,7 @@ export const receiptService = {
     <!-- Terms Reminder -->
     <div style="margin: 25px 0; padding: 15px; background: #F8FAFC; border-radius: 4px;">
       <p style="margin: 0; font-size: 13px; color: #64748B; line-height: 1.6;">
-        By accepting this contract, you agree to BlueTika's <a href="https://bluetika.co.nz/terms" style="color: #1B4FD8; text-decoration: none;">Terms & Conditions</a>. 
+        By accepting this contract, you agree to BlueTika's <a href="${baseUrl}/terms" style="color: #1B4FD8; text-decoration: none;">Terms & Conditions</a>. 
         Payment is held in escrow until work completion, photo submission, and mutual reviews. BlueTika commission is calculated based on your tier level.
         Complete all steps to ensure smooth payment release.
       </p>
@@ -486,7 +489,7 @@ export const receiptService = {
 
     <!-- CTA Button -->
     <div style="text-align: center; margin: 30px 0;">
-      <a href="https://bluetika.co.nz/contracts" style="display: inline-block; background: #10B981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">View Contract & Upload Photos</a>
+      <a href="${baseUrl}/contracts" style="display: inline-block; background: #10B981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">View Contract & Upload Photos</a>
     </div>
 
   </div>
@@ -495,7 +498,7 @@ export const receiptService = {
   <div style="text-align: center; padding: 30px 20px; color: #64748B; font-size: 13px;">
     <p style="margin: 0 0 10px 0;">Questions? Contact us at <a href="mailto:support@bluetika.co.nz" style="color: #1B4FD8; text-decoration: none;">support@bluetika.co.nz</a></p>
     <p style="margin: 0 0 10px 0;">100% NZ Owned · Kiwis Helping Kiwis</p>
-    <p style="margin: 0;"><a href="https://bluetika.co.nz" style="color: #1B4FD8; text-decoration: none;">bluetika.co.nz</a></p>
+    <p style="margin: 0;"><a href="${baseUrl}" style="color: #1B4FD8; text-decoration: none;">${baseUrl.replace('https://', '')}</a></p>
   </div>
 </body>
 </html>

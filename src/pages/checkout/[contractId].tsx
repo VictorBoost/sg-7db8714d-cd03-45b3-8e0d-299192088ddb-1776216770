@@ -104,11 +104,12 @@ function CheckoutForm({
       // Send receipts to both parties
       setSendingReceipts(true);
       try {
-        const receipt = await receiptService.generateReceipt(contract.id);
+        const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz";
+        const receipt = await receiptService.generateReceipt(contract.id, baseUrl);
         if (receipt) {
           await Promise.all([
-            receiptService.sendClientReceipt(receipt),
-            receiptService.sendProviderReceipt(receipt),
+            receiptService.sendClientReceipt(receipt, baseUrl),
+            receiptService.sendProviderReceipt(receipt, baseUrl),
           ]);
         }
       } catch (error) {

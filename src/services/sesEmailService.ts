@@ -18,7 +18,7 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>?/gm, '');
 }
 
-const baseHtml = (title: string, content: string) => `
+const baseHtml = (title: string, content: string, baseUrl: string = "https://bluetika.co.nz") => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -37,7 +37,7 @@ const baseHtml = (title: string, content: string) => `
   <div class="container">
     <div class="header"><h1>${title}</h1></div>
     <div class="content">${content}</div>
-    <div class="footer"><p>100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz</p></div>
+    <div class="footer"><p>100% NZ Owned · Kiwis Helping Kiwis · <a href="${baseUrl}">${baseUrl.replace('https://', '')}</a></p></div>
   </div>
 </body>
 </html>
@@ -71,141 +71,141 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   }
 }
 
-export async function sendEvidencePhotoReminder(recipientEmail: string, recipientName: string, contractId: string, photoType: "before" | "after", projectTitle: string): Promise<boolean> {
+export async function sendEvidencePhotoReminder(recipientEmail: string, recipientName: string, contractId: string, photoType: "before" | "after", projectTitle: string, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: `BlueTika: ${photoType === "before" ? "Before" : "After"} Photos Required`,
     htmlBody: baseHtml("Evidence Photos Required", `
       <p>Kia ora ${recipientName},</p>
       <p>This is a reminder to upload your <strong>${photoType} photos</strong> for the project: <strong>${projectTitle}</strong></p>
-      <a href="https://bluetika.co.nz/contracts" class="button">Upload Photos Now</a>
-    `)
+      <a href="${baseUrl}/contracts" class="button">Upload Photos Now</a>
+    `, baseUrl)
   });
 }
 
-export async function sendReviewReminder(recipientEmail: string, recipientName: string, contractId: string, projectTitle: string, otherPartyName: string, recipientRole: "client" | "provider"): Promise<boolean> {
+export async function sendReviewReminder(recipientEmail: string, recipientName: string, contractId: string, projectTitle: string, otherPartyName: string, recipientRole: "client" | "provider", baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: "BlueTika: Share Your Experience 🌟",
     htmlBody: baseHtml("We'd Love to Hear From You!", `
       <p>Kia ora ${recipientName},</p>
       <p>We hope your recent project went well! Your feedback helps build trust in our BlueTika community.</p>
-      <a href="https://bluetika.co.nz/contracts" class="button">Submit Your Review</a>
-    `)
+      <a href="${baseUrl}/contracts" class="button">Submit Your Review</a>
+    `, baseUrl)
   });
 }
 
-export async function sendAdminFundReleaseNotification(contractId: string, projectTitle: string): Promise<boolean> {
+export async function sendAdminFundReleaseNotification(contractId: string, projectTitle: string, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: "admin@bluetika.co.nz",
     subject: `BlueTika Admin: Funds Ready for Release - Contract ${contractId}`,
-    htmlBody: baseHtml("✅ Reviews Completed", `<p>Contract ${contractId} is ready for fund release approval.</p>`)
+    htmlBody: baseHtml("✅ Reviews Completed", `<p>Contract ${contractId} is ready for fund release approval.</p>`, baseUrl)
   });
 }
 
-export async function sendFundReleaseNotification(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", projectTitle: string, agreedPrice: number, commissionAmount: number, netToProvider: number): Promise<boolean> {
+export async function sendFundReleaseNotification(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", projectTitle: string, agreedPrice: number, commissionAmount: number, netToProvider: number, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: "BlueTika: Payment Released 🎉",
-    htmlBody: baseHtml("Payment Released!", `<p>Kia ora ${recipientName}, the payment for your project has been processed.</p>`)
+    htmlBody: baseHtml("Payment Released!", `<p>Kia ora ${recipientName}, the payment for your project has been processed.</p>`, baseUrl)
   });
 }
 
-export async function sendAdminDisputeNotification(contractId: string, projectTitle: string, raisedBy: string, raiserRole: "client" | "provider"): Promise<boolean> {
+export async function sendAdminDisputeNotification(contractId: string, projectTitle: string, raisedBy: string, raiserRole: "client" | "provider", baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: "admin@bluetika.co.nz",
     subject: `BlueTika Admin: Dispute Raised - Contract ${contractId}`,
-    htmlBody: baseHtml("⚠️ Dispute Raised", `<p>A dispute has been raised by ${raisedBy} (${raiserRole}) for project ${projectTitle}.</p>`)
+    htmlBody: baseHtml("⚠️ Dispute Raised", `<p>A dispute has been raised by ${raisedBy} (${raiserRole}) for project ${projectTitle}.</p>`, baseUrl)
   });
 }
 
-export async function sendDisputeResolutionNotification(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", projectTitle: string, resolutionType: string, resolutionReason: string, amount?: number): Promise<boolean> {
+export async function sendDisputeResolutionNotification(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", projectTitle: string, resolutionType: string, resolutionReason: string, amount?: number, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: "BlueTika: Dispute Resolved",
-    htmlBody: baseHtml("Dispute Resolved", `<p>Kia ora ${recipientName}, the dispute for your project has been resolved.</p>`)
+    htmlBody: baseHtml("Dispute Resolved", `<p>Kia ora ${recipientName}, the dispute for your project has been resolved.</p>`, baseUrl)
   });
 }
 
-export async function sendTierWarningEmail(recipientEmail: string, recipientName: string, currentTier: string, newTier: string, currentSales: number, requiredSales: number, daysLeft: number): Promise<void> {
+export async function sendTierWarningEmail(recipientEmail: string, recipientName: string, currentTier: string, newTier: string, currentSales: number, requiredSales: number, daysLeft: number, baseUrl: string = "https://bluetika.co.nz"): Promise<void> {
   await sendEmail({
     to: recipientEmail,
     subject: `BlueTika: Your ${currentTier} status needs attention`,
-    htmlBody: baseHtml("⚠️ Tier Status Update Needed", `<p>Kia ora ${recipientName}, your ${currentTier} commission tier status requires your attention.</p>`)
+    htmlBody: baseHtml("⚠️ Tier Status Update Needed", `<p>Kia ora ${recipientName}, your ${currentTier} commission tier status requires your attention.</p>`, baseUrl)
   });
 }
 
-export async function sendAdditionalChargeRequestEmail(recipientEmail: string, recipientName: string, providerName: string, projectTitle: string, amount: number, reason: string, chargeId: string): Promise<boolean> {
+export async function sendAdditionalChargeRequestEmail(recipientEmail: string, recipientName: string, providerName: string, projectTitle: string, amount: number, reason: string, chargeId: string, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: "BlueTika: Additional Charge Request",
-    htmlBody: baseHtml("Additional Charge Request", `<p>Kia ora ${recipientName}, ${providerName} requested an additional NZD $${amount}.</p>`)
+    htmlBody: baseHtml("Additional Charge Request", `<p>Kia ora ${recipientName}, ${providerName} requested an additional NZD $${amount}.</p>`, baseUrl)
   });
 }
 
-export async function sendAdditionalChargeResponseEmail(recipientEmail: string, recipientName: string, clientName: string, projectTitle: string, amount: number, status: "approved" | "declined"): Promise<boolean> {
+export async function sendAdditionalChargeResponseEmail(recipientEmail: string, recipientName: string, clientName: string, projectTitle: string, amount: number, status: "approved" | "declined", baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: `BlueTika: Additional Charge ${status === "approved" ? "Approved ✅" : "Declined"}`,
-    htmlBody: baseHtml(`Additional Charge ${status === "approved" ? "Approved" : "Declined"}`, `<p>Kia ora ${recipientName}, the charge of NZD $${amount} was ${status}.</p>`)
+    htmlBody: baseHtml(`Additional Charge ${status === "approved" ? "Approved" : "Declined"}`, `<p>Kia ora ${recipientName}, the charge of NZD $${amount} was ${status}.</p>`, baseUrl)
   });
 }
 
-export async function sendAdditionalChargePaymentEmail(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", projectTitle: string, chargeAmount: number, commissionAmount: number, netToProvider: number): Promise<boolean> {
+export async function sendAdditionalChargePaymentEmail(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", projectTitle: string, chargeAmount: number, commissionAmount: number, netToProvider: number, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: "BlueTika: Additional Charge Payment Confirmed 💰",
-    htmlBody: baseHtml("Payment Confirmed!", `<p>Kia ora ${recipientName}, the additional charge payment has been processed.</p>`)
+    htmlBody: baseHtml("Payment Confirmed!", `<p>Kia ora ${recipientName}, the additional charge payment has been processed.</p>`, baseUrl)
   });
 }
 
-export async function sendRoutineContractInvitation(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", otherPartyName: string, projectTitle: string, routineId: string): Promise<boolean> {
+export async function sendRoutineContractInvitation(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", otherPartyName: string, projectTitle: string, routineId: string, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: "BlueTika: Set Up Routine Arrangement?",
-    htmlBody: baseHtml("Routine Arrangement Available", `<p>Kia ora ${recipientName}, would you like to set up a routine arrangement with ${otherPartyName}?</p>`)
+    htmlBody: baseHtml("Routine Arrangement Available", `<p>Kia ora ${recipientName}, would you like to set up a routine arrangement with ${otherPartyName}?</p>`, baseUrl)
   });
 }
 
-export async function sendSessionReminderEmail(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", otherPartyName: string, projectTitle: string, sessionDate: string, location: string): Promise<boolean> {
+export async function sendSessionReminderEmail(recipientEmail: string, recipientName: string, recipientRole: "client" | "provider", otherPartyName: string, projectTitle: string, sessionDate: string, location: string, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: recipientEmail,
     subject: `BlueTika: Session Reminder - ${projectTitle}`,
-    htmlBody: baseHtml("⏰ Session in 48 Hours", `<p>Kia ora ${recipientName}, reminder that you have a scheduled session coming up.</p>`)
+    htmlBody: baseHtml("⏰ Session in 48 Hours", `<p>Kia ora ${recipientName}, reminder that you have a scheduled session coming up.</p>`, baseUrl)
   });
 }
 
-export async function sendAdminSuspensionAlert(userName: string, userEmail: string, attemptCount: number, suspensionType: "auto_suspended" | "permanently_banned"): Promise<boolean> {
+export async function sendAdminSuspensionAlert(userName: string, userEmail: string, attemptCount: number, suspensionType: "auto_suspended" | "permanently_banned", baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
     to: "admin@bluetika.co.nz",
     subject: `BlueTika Admin: User ${suspensionType === "permanently_banned" ? "Permanently Banned" : "Auto-Suspended"}`,
-    htmlBody: baseHtml("⚠️ Security Alert", `<p>User ${userName} (${userEmail}) has been ${suspensionType}.</p>`)
+    htmlBody: baseHtml("⚠️ Security Alert", `<p>User ${userName} (${userEmail}) has been ${suspensionType}.</p>`, baseUrl)
   });
 }
 
-export async function sendDocumentAutoApproved(toEmail: string, providerName: string, documentType: string, confidenceScore: number) {
+export async function sendDocumentAutoApproved(toEmail: string, providerName: string, documentType: string, confidenceScore: number, baseUrl: string = "https://bluetika.co.nz") {
   return sendEmail({
     to: toEmail,
     subject: `✓ ${documentType} Auto-Verified - BlueTika`,
     htmlBody: baseHtml("✓ Document Auto-Verified!", `
       <p>Kia ora ${providerName},</p>
       <p>Great news! Your <strong>${documentType}</strong> has been automatically verified by our AI system (Score: ${confidenceScore}%).</p>
-    `)
+    `, baseUrl)
   });
 }
 
-export async function sendDocumentManuallyApproved(toEmail: string, providerName: string, documentType: string) {
+export async function sendDocumentManuallyApproved(toEmail: string, providerName: string, documentType: string, baseUrl: string = "https://bluetika.co.nz") {
   return sendEmail({
     to: toEmail,
     subject: `✓ ${documentType} Verified - BlueTika`,
     htmlBody: baseHtml("✓ Document Verified!", `
       <p>Kia ora ${providerName},</p>
       <p>Your <strong>${documentType}</strong> has been reviewed and approved by our verification team.</p>
-    `)
+    `, baseUrl)
   });
 }
 
-export async function sendDocumentRejected(toEmail: string, providerName: string, documentType: string, rejectionReason: string) {
+export async function sendDocumentRejected(toEmail: string, providerName: string, documentType: string, rejectionReason: string, baseUrl: string = "https://bluetika.co.nz") {
   return sendEmail({
     to: toEmail,
     subject: `Action Required: ${documentType} Not Verified - BlueTika`,
@@ -213,7 +213,7 @@ export async function sendDocumentRejected(toEmail: string, providerName: string
       <p>Kia ora ${providerName},</p>
       <p>We've reviewed your <strong>${documentType}</strong>, but it was rejected.</p>
       <p>Reason: ${rejectionReason}</p>
-    `)
+    `, baseUrl)
   });
 }
 
