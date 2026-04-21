@@ -50,7 +50,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { error: signInError } = await authService.signIn(
+      const { error: signInError } = await authService.signInWithPassword(
         formData.email,
         formData.password
       );
