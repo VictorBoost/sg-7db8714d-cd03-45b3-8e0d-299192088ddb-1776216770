@@ -15,6 +15,12 @@ export interface AuthError {
 
 // Dynamic URL Helper
 const getURL = () => {
+  // In browser: always use window.location.origin (production safe)
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  
+  // Server-side: check env vars
   let url = process?.env?.NEXT_PUBLIC_VERCEL_URL ?? 
            process?.env?.NEXT_PUBLIC_SITE_URL ?? 
            'http://localhost:3000'
