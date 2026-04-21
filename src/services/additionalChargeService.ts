@@ -47,6 +47,7 @@ export const additionalChargeService = {
 
       // Email notification
       if (clientEmail) {
+        const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz";
         await sendAdditionalChargeRequestEmail(
           clientEmail,
           clientName,
@@ -54,7 +55,8 @@ export const additionalChargeService = {
           projectTitle,
           amount,
           reason,
-          data.id
+          data.id,
+          baseUrl
         );
       }
 
@@ -120,13 +122,15 @@ export const additionalChargeService = {
 
       // Email notification
       if (providerEmail) {
+        const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz";
         await sendAdditionalChargeResponseEmail(
           providerEmail,
           providerName,
           clientName,
           projectTitle,
           data.amount,
-          "approved"
+          "approved",
+          baseUrl
         );
       }
 
@@ -176,13 +180,15 @@ export const additionalChargeService = {
 
       // Email notification
       if (providerEmail) {
+        const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz";
         await sendAdditionalChargeResponseEmail(
           providerEmail,
           providerName,
           clientName,
           projectTitle,
           data.amount,
-          "declined"
+          "declined",
+          baseUrl
         );
       }
 
@@ -248,6 +254,7 @@ export const additionalChargeService = {
       const clientName = data.client?.full_name || data.client?.email || "Client";
 
       // Email notifications to both parties
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://bluetika.co.nz";
       if (providerEmail) {
         await sendAdditionalChargePaymentEmail(
           providerEmail,
@@ -256,7 +263,8 @@ export const additionalChargeService = {
           projectTitle,
           data.amount,
           commissionAmount,
-          netToProvider
+          netToProvider,
+          baseUrl
         );
       }
       if (clientEmail) {
@@ -267,7 +275,8 @@ export const additionalChargeService = {
           projectTitle,
           data.amount,
           commissionAmount,
-          netToProvider
+          netToProvider,
+          baseUrl
         );
       }
 
