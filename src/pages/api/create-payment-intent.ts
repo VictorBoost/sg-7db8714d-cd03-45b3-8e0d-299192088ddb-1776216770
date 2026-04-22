@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
+import { supabase } from "@/integrations/supabase/client";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-02-24.acacia",
@@ -16,20 +17,48 @@ export default async function handler(
   try {
     const { amount, contractId, platformFee, paymentProcessingFee } = req.body;
 
-    // CRITICAL: Create payment intent that holds funds in BlueTika's Stripe account
-    // Funds are NOT transferred to provider's connected account yet
-    // They will be transferred manually by admin after work completion + reviews
+    // Get contract details to fetch provider's Stripe account
+    const { data: contract, error: contractError } = await supabase
+      .from("contracts")
+      .select(`
+        provider_id,
+        profiles!contracts_provider_id_fkey(stripe_account_id, stripe_onboarding_complete)
+      `)
+      .eq("id", contractId)
+      .single();
+
+    if (contractError || !contract) {
+      return res.status(404).json({ error: "Contract not found" });
+    }
+
+    const providerProfile = contract.profiles as any;
+    const stripeAccountId = providerProfile?.stripe_account_id;
+    const onboardingComplete = providerProfile?.stripe_onboarding_complete;
+
+    if (!stripeAccountId || !onboardingComplete) {
+      return res.status(400).json({ 
+        error: "Provider has not completed Stripe onboarding" 
+      });
+    }
+
+    // Calculate application fee (BlueTika's commission)
+    // platformFee is already calculated as percentage of contract amount
+    const applicationFeeAmount = Math.round(platformFee * 100); // Convert to cents
+
+    // Create payment intent with Stripe Connect
     const paymentIntent = await stripe.paymentIntents.create({
-      amount, // Amount in cents
+      amount, // Total amount in cents (contract + platform fee + processing fee)
       currency: "nzd",
+      application_fee_amount: applicationFeeAmount, // BlueTika's commission
+      transfer_data: {
+        destination: stripeAccountId, // Provider's connected account
+      },
       metadata: {
         contractId,
         platformFee: platformFee.toString(),
         paymentProcessingFee: paymentProcessingFee.toString(),
       },
-      description: `BlueTika Contract ${contractId} - Payment held in escrow`,
-      // NO application_fee_amount or transfer_data here
-      // Funds stay in BlueTika's account until admin manually releases them
+      description: `BlueTika Contract ${contractId}`,
     });
 
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
