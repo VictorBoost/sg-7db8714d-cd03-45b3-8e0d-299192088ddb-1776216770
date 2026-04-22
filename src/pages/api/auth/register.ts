@@ -17,9 +17,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Missing required fields" });
   }
 
+  // Validate environment variables
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables");
+    return res.status(500).json({ error: "Server configuration error. Please contact support." });
+  }
+
   try {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -40,9 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!authData.user) {
+      console.error("User creation failed: no user returned");
       return res.status(400).json({ error: "User creation failed" });
     }
 
+    // Update profile (ignore errors as profile might already exist from trigger)
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
@@ -58,8 +67,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (profileError) {
       console.error("Profile update error:", profileError);
+      // Don't fail registration if profile update fails
     }
 
+    // Sign in to create session
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
     const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
       email,
@@ -71,6 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Registration successful but failed to log in. Please log in manually." });
     }
 
+    // Set session cookie
     res.setHeader(
       "Set-Cookie",
       `sb-access-token=${signInData.session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600`
