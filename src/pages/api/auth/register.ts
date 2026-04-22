@@ -116,7 +116,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Send welcome email asynchronously (non-blocking)
     console.log("Sending welcome email (async)...");
-    sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").catch(error => {
+    sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").then(emailSent => {
+      console.log(emailSent ? "✅ Welcome email sent" : "⚠️ Welcome email failed");
+    }).catch(error => {
       console.error("⚠️ Welcome email failed (non-critical):", error);
     });
 

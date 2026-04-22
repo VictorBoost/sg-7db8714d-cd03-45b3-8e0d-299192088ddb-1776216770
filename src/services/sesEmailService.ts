@@ -45,9 +45,16 @@ const baseHtml = (title: string, content: string, baseUrl: string = "https://blu
 
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   if (!SES_API_ENDPOINT) {
-    console.warn("SES_API_ENDPOINT not configured, skipping email send");
+    console.warn("⚠️ SES_API_ENDPOINT not configured, skipping email send");
+    console.warn("   Set NEXT_PUBLIC_SES_ENDPOINT in .env.local to enable emails");
     return false;
   }
+  
+  console.log("📧 Sending email via SES:");
+  console.log("   To:", params.to);
+  console.log("   Subject:", params.subject);
+  console.log("   Endpoint:", SES_API_ENDPOINT);
+  
   try {
     const response = await fetch(SES_API_ENDPOINT, {
       method: "POST",
@@ -60,13 +67,17 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
         textBody: params.textBody || stripHtml(params.htmlBody)
       })
     });
+    
     if (!response.ok) {
-      console.error("SES email failed:", await response.text());
+      const errorText = await response.text();
+      console.error("❌ SES email failed:", response.status, errorText);
       return false;
     }
+    
+    console.log("✅ Email sent successfully");
     return true;
   } catch (error) {
-    console.error("Error sending SES email:", error);
+    console.error("❌ Error sending SES email:", error);
     return false;
   }
 }
