@@ -102,9 +102,9 @@ export default function RegisterPage() {
     setSuccess(true);
     setLoading(false);
 
-    // Redirect to login after showing success message
+    // Redirect to projects page after showing success message
     setTimeout(() => {
-      router.push("/login");
+      router.push("/projects");
     }, 3000);
   };
 
@@ -134,17 +134,17 @@ export default function RegisterPage() {
               <div className="mx-auto w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle2 className="w-6 h-6 text-success" />
               </div>
-              <CardTitle>Check Your Email</CardTitle>
+              <CardTitle>Welcome to BlueTika!</CardTitle>
               <CardDescription>
-                We've sent a verification link to <strong>{formData.email}</strong>
+                Your account has been created successfully
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Click the link in the email to verify your account and complete registration.
+                You're now logged in and ready to post your first project or browse available projects.
               </p>
               <Button asChild className="w-full">
-                <Link href="/login">Go to Login</Link>
+                <Link href="/projects">Browse Projects</Link>
               </Button>
             </CardContent>
           </Card>
