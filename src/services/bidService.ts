@@ -5,7 +5,7 @@ import { sesEmailService } from "./sesEmailService";
 export type Bid = Tables<"bids">;
 
 export const bidService = {
-  async createBid(bidData: Omit<Bid, "id" | "created_at">): Promise<{ data: Bid | null; error: any }> {
+  async createBid(bidData: Omit<Bid, "id" | "created_at" | "updated_at">): Promise<{ data: Bid | null; error: any }> {
     const { data, error } = await supabase
       .from("bids")
       .insert(bidData)
@@ -186,7 +186,7 @@ export const bidService = {
       await Promise.all(
         pendingBids.map(bid => {
           if (bid.profiles?.email) {
-            return sendBidDeclinedEmail(
+            return sesEmailService.sendBidDeclinedEmail(
               bid.profiles.email,
               bid.profiles.full_name || "there",
               projectData.title,
