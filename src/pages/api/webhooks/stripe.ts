@@ -58,7 +58,7 @@ export default async function handler(
             .update({ 
               status: "paid",
               paid_at: new Date().toISOString(),
-            })
+            } as any)
             .eq("id", isAdditionalCharge);
 
           if (chargeError) {
