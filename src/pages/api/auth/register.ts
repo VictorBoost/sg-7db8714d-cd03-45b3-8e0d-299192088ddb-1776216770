@@ -76,6 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `sb-access-token=${signInData.session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600`
     );
 
+    // Send welcome email asynchronously (non-blocking)
     sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").catch(error => {
       console.error("Welcome email failed (non-critical):", error);
     });
