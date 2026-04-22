@@ -52,15 +52,11 @@ export default async function handler(
         const isAdditionalCharge = paymentIntent.metadata.additional_charge_id;
 
         if (isAdditionalCharge) {
-          // Handle additional charge payment - cast to any to bypass strict typing
-          const updatePayload: any = { 
-            status: "paid",
-            paid_at: new Date().toISOString(),
-          };
-          
-          const { error: chargeError } = await supabase
-            .from("additional_charges")
-            .update(updatePayload)
+          const { error: chargeError } = await (supabase.from("additional_charges") as any)
+            .update({ 
+              status: "paid",
+              paid_at: new Date().toISOString(),
+            })
             .eq("id", isAdditionalCharge);
 
           if (chargeError) {
@@ -69,9 +65,7 @@ export default async function handler(
             console.log(`Additional charge ${isAdditionalCharge} marked as paid`);
           }
         } else if (contractId) {
-          // Handle main contract payment
-          const { error: contractError } = await supabase
-            .from("contracts")
+          const { error: contractError } = await (supabase.from("contracts") as any)
             .update({ 
               payment_status: "paid",
               paid_at: new Date().toISOString(),
@@ -94,10 +88,9 @@ export default async function handler(
                           account.charges_enabled && 
                           account.payouts_enabled;
 
-        const { error: updateError } = await supabase
-          .from("profiles")
+        const { error: updateError } = await (supabase.from("profiles") as any)
           .update({
-            stripe_account_status: (isComplete ? "active" : "pending") as any,
+            stripe_account_status: isComplete ? "active" : "pending",
           })
           .eq("stripe_account_id", account.id);
 
@@ -113,21 +106,18 @@ export default async function handler(
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         console.log(`Subscription ${event.type}: ${subscription.id}`);
-        // Add subscription handling logic here if needed
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
         console.log(`Subscription deleted: ${subscription.id}`);
-        // Add subscription cancellation logic here if needed
         break;
       }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         console.log(`Invoice payment failed: ${invoice.id}`);
-        // Add failed payment handling logic here
         break;
       }
 
@@ -136,11 +126,10 @@ export default async function handler(
         const accountId = application.id || application.account;
         
         if (accountId) {
-          const { error: updateError } = await supabase
-            .from("profiles")
+          const { error: updateError } = await (supabase.from("profiles") as any)
             .update({
-              stripe_account_id: null as any,
-              stripe_account_status: "not_connected" as any
+              stripe_account_id: null,
+              stripe_account_status: "not_connected"
             })
             .eq("stripe_account_id", accountId);
 
