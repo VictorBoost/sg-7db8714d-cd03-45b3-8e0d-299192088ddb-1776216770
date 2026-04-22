@@ -1,51 +1,63 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
+import cookie from "cookie";
+import { sesEmailService } from "@/services/sesEmailService";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { email, password, metadata } = req.body;
+  const { email, password, fullName } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password required" });
+  if (!email || !password || !fullName) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    // Create a server-side Supabase client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the base URL for email redirect
-    const baseUrl = req.headers.origin || `https://${req.headers.host}`;
-
-    // Sign up with Supabase
-    const { data, error } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: metadata,
-        emailRedirectTo: `${baseUrl}/login`,
-      },
+        data: { full_name: fullName }
+      }
     });
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
     }
 
-    // Don't set session cookie here - user must verify email first
+    if (!authData.user || !authData.session) {
+      return res.status(400).json({ error: "Registration failed" });
+    }
+
+    // Send welcome email
+    try {
+      await sesEmailService.sendWelcomeEmail(email, fullName, "https://bluetika.co.nz");
+    } catch (emailError) {
+      console.error("Welcome email failed:", emailError);
+      // Don't fail registration if email fails
+    }
+
+    // Set httpOnly cookie with session
+    const sessionCookie = cookie.serialize("sb-session", authData.session.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 28800, // 8 hours
+      path: "/",
+    });
+
+    res.setHeader("Set-Cookie", sessionCookie);
+
     return res.status(200).json({
-      user: data.user ? {
-        id: data.user.id,
-        email: data.user.email,
-      } : null,
-      message: "Registration successful. Please check your email to verify your account.",
+      user: authData.user,
+      session: authData.session,
     });
   } catch (error) {
     console.error("Registration error:", error);

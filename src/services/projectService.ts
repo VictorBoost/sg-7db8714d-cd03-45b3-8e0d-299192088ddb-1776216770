@@ -1,28 +1,62 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { sesEmailService } from "./sesEmailService";
 
 export type Project = Tables<"projects">;
-export type ProjectInsert = Omit<Project, "id" | "created_at" | "updated_at">;
 
 export const projectService = {
-  async getAllProjects(status?: string) {
-    let query = supabase
+  async createProject(projectData: Omit<Project, "id" | "created_at">): Promise<{ data: Project | null; error: any }> {
+    const { data, error } = await supabase
       .from("projects")
-      .select(`
-        *,
-        client:profiles!projects_client_id_fkey(id, full_name, email),
-        category:categories(id, name, slug),
-        bids(count)
-      `)
-      .order("created_at", { ascending: false });
+      .insert(projectData)
+      .select()
+      .single();
 
-    if (status) {
-      query = query.eq("status", status);
+    if (data && !error) {
+      // Check if this is the user's first project and send email
+      await this.checkAndSendFirstProjectEmail(projectData.client_id, data);
     }
 
-    const { data, error } = await query;
-    console.log("getAllProjects:", { data, error });
-    if (error) console.error("Projects fetch error:", error);
+    return { data, error };
+  },
+
+  async checkAndSendFirstProjectEmail(userId: string, project: Project): Promise<void> {
+    try {
+      // Count total projects by this user
+      const { count } = await supabase
+        .from("projects")
+        .select("*", { count: "exact", head: true })
+        .eq("client_id", userId);
+
+      // If this is their first project, send welcome email
+      if (count === 1) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", userId)
+          .single();
+
+        if (profile?.email && profile?.full_name) {
+          await sesEmailService.sendFirstProjectPosted(
+            profile.email,
+            profile.full_name,
+            project.title,
+            project.id,
+            "https://bluetika.co.nz"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error checking/sending first project email:", error);
+    }
+  },
+
+  async getAllProjects(): Promise<{ data: Project[] | null; error: any }> {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
     return { data, error };
   },
 
@@ -43,18 +77,6 @@ export const projectService = {
 
     console.log("getProject:", { data, error });
     if (error) console.error("Project fetch error:", error);
-    return { data, error };
-  },
-
-  async createProject(project: ProjectInsert) {
-    const { data, error } = await supabase
-      .from("projects")
-      .insert(project)
-      .select()
-      .single();
-
-    console.log("createProject:", { data, error });
-    if (error) console.error("Project create error:", error);
     return { data, error };
   },
 

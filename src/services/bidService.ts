@@ -1,34 +1,70 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
-import { sendBidDeclinedEmail } from "./sesEmailService";
+import { sesEmailService } from "./sesEmailService";
 
 export type Bid = Tables<"bids">;
-export type BidInsert = Omit<Bid, "id" | "created_at" | "updated_at">;
 
 export const bidService = {
-  async createBid(bid: BidInsert) {
+  async createBid(bidData: Omit<Bid, "id" | "created_at">): Promise<{ data: Bid | null; error: any }> {
     const { data, error } = await supabase
       .from("bids")
-      .insert(bid)
-      .select(`
-        *,
-        profiles!bids_provider_id_fkey(
-          id,
-          full_name,
-          email,
-          phone,
-          bio,
-          average_rating,
-          total_reviews,
-          response_rate,
-          commission_tier,
-          verification_status
-        )
-      `)
+      .insert(bidData)
+      .select()
       .single();
 
-    console.log("createBid:", { data, error });
-    if (error) console.error("Bid create error:", error);
+    if (data && !error) {
+      // Check if this is the provider's first bid and send email
+      await this.checkAndSendFirstBidEmail(bidData.provider_id, data);
+    }
+
+    return { data, error };
+  },
+
+  async checkAndSendFirstBidEmail(providerId: string, bid: Bid): Promise<void> {
+    try {
+      // Count total bids by this provider
+      const { count } = await supabase
+        .from("bids")
+        .select("*", { count: "exact", head: true })
+        .eq("provider_id", providerId);
+
+      // If this is their first bid, send welcome email
+      if (count === 1) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", providerId)
+          .single();
+
+        const { data: project } = await supabase
+          .from("projects")
+          .select("title")
+          .eq("id", bid.project_id)
+          .single();
+
+        if (profile?.email && profile?.full_name && project?.title) {
+          await sesEmailService.sendFirstBidSubmitted(
+            profile.email,
+            profile.full_name,
+            project.title,
+            bid.project_id,
+            bid.amount,
+            "https://bluetika.co.nz"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error checking/sending first bid email:", error);
+    }
+  },
+
+  async getBidsByProject(projectId: string): Promise<{ data: Bid[] | null; error: any }> {
+    const { data, error } = await supabase
+      .from("bids")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+    
     return { data, error };
   },
 
