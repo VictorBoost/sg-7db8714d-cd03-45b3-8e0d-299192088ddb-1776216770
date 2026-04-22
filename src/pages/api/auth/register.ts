@@ -11,20 +11,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { email, password, fullName } = req.body;
+  const { email, password, firstName, lastName, phoneNumber, cityRegion, isClient, isProvider } = req.body;
 
-  if (!email || !password || !fullName) {
+  if (!email || !password || !firstName || !lastName || !phoneNumber || !cityRegion) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Create auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: { full_name: fullName }
+      email_confirm: true, // Auto-confirm email for now
+      user_metadata: {
+        full_name: `${firstName} ${lastName}`,
       }
     });
 
@@ -32,20 +34,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: authError.message });
     }
 
-    if (!authData.user || !authData.session) {
+    if (!authData.user) {
       return res.status(400).json({ error: "Registration failed" });
     }
 
-    // Send welcome email
-    try {
-      await sesEmailService.sendWelcomeEmail(email, fullName, "https://bluetika.co.nz");
-    } catch (emailError) {
-      console.error("Welcome email failed:", emailError);
-      // Don't fail registration if email fails
+    // Create profile with all metadata
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .insert({
+        id: authData.user.id,
+        email: email,
+        full_name: `${firstName} ${lastName}`,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+        city_region: cityRegion,
+        is_client: isClient || false,
+        is_provider: isProvider || false,
+      });
+
+    if (profileError) {
+      console.error("Profile creation error:", profileError);
+      // Continue anyway - profile trigger might have created it
     }
 
+    // Create session for the user
+    const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
+      type: "magiclink",
+      email: email,
+    });
+
+    // Sign in the user to get a proper session
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError || !signInData.session) {
+      return res.status(400).json({ error: "Failed to create session" });
+    }
+
+    // Send welcome email (non-blocking)
+    sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").catch(error => {
+      console.error("Welcome email failed:", error);
+    });
+
     // Set httpOnly cookie with session
-    const sessionCookie = cookie.serialize("sb-session", authData.session.access_token, {
+    const sessionCookie = cookie.serialize("sb-session", signInData.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -56,8 +91,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Set-Cookie", sessionCookie);
 
     return res.status(200).json({
-      user: authData.user,
-      session: authData.session,
+      user: signInData.user,
+      session: signInData.session,
     });
   } catch (error) {
     console.error("Registration error:", error);

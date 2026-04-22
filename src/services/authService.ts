@@ -54,30 +54,45 @@ export const authService = {
   },
 
   // Sign up with email and password
-  async signUp(email: string, password: string, metadata?: any) {
+  async signUp(
+    email: string,
+    password: string,
+    metadata: {
+      first_name: string;
+      last_name: string;
+      phone_number: string;
+      city_region: string;
+      is_client: boolean;
+      is_provider: boolean;
+    }
+  ): Promise<{ user: User | null; session: Session | null; error: any }> {
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           email,
           password,
-          metadata,
+          firstName: metadata.first_name,
+          lastName: metadata.last_name,
+          phoneNumber: metadata.phone_number,
+          cityRegion: metadata.city_region,
+          isClient: metadata.is_client,
+          isProvider: metadata.is_provider,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        return { user: null, error: { message: data.error || "Registration failed" } };
+        return { user: null, session: null, error: { message: data.error } };
       }
 
-      return { user: data.user, error: null };
-    } catch (error: any) {
-      return { user: null, error: { message: "Network error during registration" } };
+      return { user: data.user, session: data.session, error: null };
+    } catch (error) {
+      console.error("SignUp error:", error);
+      return { user: null, session: null, error: { message: "Network error" } };
     }
   },
 
