@@ -52,13 +52,15 @@ export default async function handler(
         const isAdditionalCharge = paymentIntent.metadata.additional_charge_id;
 
         if (isAdditionalCharge) {
-          // Handle additional charge payment - use raw update to avoid type conflicts
+          // Handle additional charge payment - cast to any to bypass strict typing
+          const updatePayload: any = { 
+            status: "paid",
+            paid_at: new Date().toISOString(),
+          };
+          
           const { error: chargeError } = await supabase
             .from("additional_charges")
-            .update({ 
-              status: "paid" as any,
-              paid_at: new Date().toISOString() as any,
-            })
+            .update(updatePayload)
             .eq("id", isAdditionalCharge);
 
           if (chargeError) {
