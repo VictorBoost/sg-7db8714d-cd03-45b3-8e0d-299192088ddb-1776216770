@@ -1,5 +1,6 @@
 import { SEO } from "@/components/SEO";
 import { Footer } from "@/components/Footer";
+import { Navigation } from "@/components/Navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Shield, Heart, Users } from "lucide-react";
@@ -13,15 +14,7 @@ export default function About() {
       />
       
       <div className="min-h-screen flex flex-col bg-background">
-        {/* Navigation */}
-        <div className="container py-6">
-          <Button variant="ghost" asChild className="mb-4">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </Button>
-        </div>
+        <Navigation />
 
         <main className="flex-1">
           {/* Hero Section with Koru */}

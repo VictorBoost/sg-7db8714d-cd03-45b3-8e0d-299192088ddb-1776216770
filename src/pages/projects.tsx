@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SEO } from "@/components/SEO";
 import { Footer } from "@/components/Footer";
+import { Navigation } from "@/components/Navigation";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,6 +115,7 @@ export default function Projects() {
       />
       
       <div className="min-h-screen flex flex-col">
+        <Navigation />
         <div className="container py-8">
           <div className="flex flex-col gap-8">
             {/* Header */}

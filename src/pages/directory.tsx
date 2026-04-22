@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { SEO } from "@/components/SEO";
+import { Navigation } from "@/components/Navigation";
 import { DirectorySearchBar } from "@/components/DirectorySearchBar";
 import { DirectoryListingCard } from "@/components/DirectoryListingCard";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export default function DirectoryPage() {
       />
 
       <div className="min-h-screen bg-background">
+        <Navigation />
         {/* Header */}
         <div className="bg-primary text-primary-foreground py-12">
           <div className="container mx-auto px-4 max-w-6xl">
