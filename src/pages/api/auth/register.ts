@@ -88,9 +88,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log("✅ Profile updated");
     }
 
-    // Sign in to create session - use service role to bypass any restrictions
+    // Sign in to create session using regular client (not admin)
     console.log("Creating session...");
-    const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
       email,
       password,
     });
