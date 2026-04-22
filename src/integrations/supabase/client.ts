@@ -19,7 +19,8 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false, // Disable client-side session storage - use httpOnly cookies instead
+    autoRefreshToken: false, // Disable auto-refresh - handled server-side
+    detectSessionInUrl: false, // Disable URL detection - OAuth handled server-side
   }
 });
