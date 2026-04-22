@@ -859,6 +859,24 @@ export type Database = {
         }
         Relationships: []
       }
+      connection_test: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+        }
+        Relationships: []
+      }
       contract_evidence_photos: {
         Row: {
           confirmed_at: string | null
