@@ -20,30 +20,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create auth user
+    // Create auth user with email confirmation
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm email for now
+      email_confirm: true,
       user_metadata: {
         full_name: `${firstName} ${lastName}`,
       }
     });
 
     if (authError) {
+      console.error("Auth creation error:", authError);
       return res.status(400).json({ error: authError.message });
     }
 
     if (!authData.user) {
-      return res.status(400).json({ error: "Registration failed" });
+      return res.status(400).json({ error: "User creation failed" });
     }
 
-    // Create profile with all metadata
+    // Update profile with all registration data (trigger should create basic profile)
     const { error: profileError } = await supabase
       .from("profiles")
-      .insert({
-        id: authData.user.id,
-        email: email,
+      .update({
         full_name: `${firstName} ${lastName}`,
         first_name: firstName,
         last_name: lastName,
@@ -51,32 +50,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         city_region: cityRegion,
         is_client: isClient || false,
         is_provider: isProvider || false,
-      });
+      })
+      .eq("id", authData.user.id);
 
     if (profileError) {
-      console.error("Profile creation error:", profileError);
-      // Continue anyway - profile trigger might have created it
+      console.error("Profile update error:", profileError);
+      // Don't fail registration if profile update fails - user is created
     }
 
-    // Create session for the user
+    // Generate session for the new user
     const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
       type: "magiclink",
       email: email,
     });
 
-    // Sign in the user to get a proper session
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    // Use regular client to sign in and get session
+    const regularClient = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data: signInData, error: signInError } = await regularClient.auth.signInWithPassword({
       email,
       password,
     });
 
     if (signInError || !signInData.session) {
+      console.error("Session creation error:", signInError);
       return res.status(400).json({ error: "Failed to create session" });
     }
 
     // Send welcome email (non-blocking)
     sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").catch(error => {
-      console.error("Welcome email failed:", error);
+      console.error("Welcome email failed (non-critical):", error);
     });
 
     // Set httpOnly cookie with session
