@@ -7,26 +7,40 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log("\n=== REGISTRATION ENDPOINT CALLED ===");
+  console.log("Method:", req.method);
+  
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const { email, password, firstName, lastName, phoneNumber, cityRegion, isClient, isProvider } = req.body;
+  console.log("Registration attempt for:", email);
+  console.log("Fields received:", { firstName, lastName, phoneNumber, cityRegion, isClient, isProvider });
 
   if (!email || !password || !firstName || !lastName || !phoneNumber || !cityRegion) {
+    console.log("❌ Missing required fields");
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   // Validate environment variables
+  console.log("Environment check:", {
+    supabaseUrl: !!supabaseUrl,
+    supabaseServiceKey: !!supabaseServiceKey,
+    supabaseAnonKey: !!supabaseAnonKey
+  });
+
   if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables");
+    console.error("❌ Missing Supabase environment variables");
     return res.status(500).json({ error: "Server configuration error. Please contact support." });
   }
 
   try {
+    console.log("Creating Supabase admin client...");
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Create auth user
+    console.log("Creating auth user...");
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -37,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (authError) {
-      console.error("Auth creation error:", authError);
+      console.error("❌ Auth creation error:", authError);
       
       if (authError.message.includes("already registered")) {
         return res.status(400).json({ error: "This email is already registered" });
@@ -47,11 +61,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!authData.user) {
-      console.error("User creation failed: no user returned");
+      console.error("❌ User creation failed: no user returned");
       return res.status(400).json({ error: "User creation failed" });
     }
 
+    console.log("✅ Auth user created:", authData.user.id);
+
     // Update profile (ignore errors as profile might already exist from trigger)
+    console.log("Updating profile...");
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
@@ -66,11 +83,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq("id", authData.user.id);
 
     if (profileError) {
-      console.error("Profile update error:", profileError);
-      // Don't fail registration if profile update fails
+      console.error("⚠️ Profile update error (non-critical):", profileError);
+    } else {
+      console.log("✅ Profile updated");
     }
 
     // Sign in to create session
+    console.log("Creating session...");
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
     const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
       email,
@@ -78,9 +97,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (signInError || !signInData.session) {
-      console.error("Session creation error:", signInError);
+      console.error("❌ Session creation error:", signInError);
       return res.status(400).json({ error: "Registration successful but failed to log in. Please log in manually." });
     }
+
+    console.log("✅ Session created");
 
     // Set session cookie
     res.setHeader(
@@ -89,16 +110,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     // Send welcome email asynchronously (non-blocking)
+    console.log("Sending welcome email (async)...");
     sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").catch(error => {
-      console.error("Welcome email failed (non-critical):", error);
+      console.error("⚠️ Welcome email failed (non-critical):", error);
     });
+
+    console.log("✅ Registration complete!");
+    console.log("=== REGISTRATION ENDPOINT COMPLETE ===\n");
 
     return res.status(200).json({
       user: signInData.user,
       session: signInData.session,
     });
   } catch (error: any) {
-    console.error("Registration error:", error);
+    console.error("❌ REGISTRATION ERROR:", error);
+    console.error("Error details:", {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    });
     return res.status(500).json({ 
       error: error?.message || "Connection error. Please try again." 
     });
