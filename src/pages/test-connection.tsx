@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,7 @@ export default function TestConnection() {
         </Card>
 
         <div className="text-center text-sm text-muted-foreground">
-          <p>Visit <a href="/" className="text-primary hover:underline">/</a> to return to home page</p>
+          <p>Visit <Link href="/" className="text-primary hover:underline">/</Link> to return to home page</p>
         </div>
       </div>
     </div>
