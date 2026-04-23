@@ -166,120 +166,34 @@ export const botLabService = {
   },
 
   async generateBots(count: number = 50) {
-    const results = {
-      success: 0,
-      failed: 0,
-      errors: [] as string[],
-      botIds: [] as string[]
-    };
-
-    const batch = Date.now();
-    const providerCount = Math.floor(count * 0.4);
-    const clientCount = count - providerCount;
-
-    // Generate provider bots
-    for (let i = 0; i < providerCount; i++) {
-      try {
-        const botId = await this.createBot("provider", batch);
-        if (botId) {
-          results.success++;
-          results.botIds.push(botId);
-        } else {
-          results.failed++;
-          results.errors.push(`Provider bot ${i}: Registration failed`);
-        }
-      } catch (error) {
-        results.failed++;
-        results.errors.push(`Provider bot ${i}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    try {
+      const response = await fetch('/api/generate-bots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
       }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Failed to generate bots:", error);
+      return { success: 0, failed: count, errors: [error instanceof Error ? error.message : "Unknown error"] };
     }
-
-    // Generate client bots
-    for (let i = 0; i < clientCount; i++) {
-      try {
-        const botId = await this.createBot("client", batch);
-        if (botId) {
-          results.success++;
-          results.botIds.push(botId);
-        } else {
-          results.failed++;
-          results.errors.push(`Client bot ${i}: Registration failed`);
-        }
-      } catch (error) {
-        results.failed++;
-        results.errors.push(`Client bot ${i}: ${error instanceof Error ? error.message : "Unknown error"}`);
-      }
-    }
-
-    return results;
   },
 
   async createBot(type: "client" | "provider", batch: number): Promise<string | null> {
-    const firstName = randomItem(NZ_FIRST_NAMES);
-    const lastName = randomItem(NZ_LAST_NAMES);
-    const city = randomItem(NZ_CITIES);
-    const email = generateEmail(firstName, lastName, batch);
-    const password = `BotPass${batch}!`;
-
     try {
-      // Create auth user directly with Supabase Admin API
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: `${firstName} ${lastName}`,
-            is_bot: true
-          },
-          emailRedirectTo: undefined // Skip email confirmation for bots
-        }
+      const response = await fetch('/api/generate-bots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: 1 })
       });
-
-      if (authError || !authData.user) {
-        console.error("Bot auth creation failed:", authError);
-        return null;
-      }
-
-      const userId = authData.user.id;
-
-      // Update profile with bot-specific data
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: `${firstName} ${lastName}`,
-          bio: generateBio(type === "provider", city),
-          city_region: city,
-          phone_number: `021 ${randomInRange(100, 999)} ${randomInRange(1000, 9999)}`,
-          user_type: type === "provider" ? "both" : "client",
-          is_provider: type === "provider",
-          is_client: true,
-          verification_status: type === "provider" ? "approved" : "not_started"
-        } as any)
-        .eq("id", userId);
-
-      if (profileError) {
-        console.error("Profile update failed:", profileError);
-      }
-
-      // Create bot account record
-      const { data: botData, error: botError } = await supabase
-        .from("bot_accounts")
-        .insert({
-          profile_id: userId,
-          bot_type: type === "provider" ? "service_provider" : "client",
-          generation_batch: batch
-        })
-        .select()
-        .single();
-
-      if (botError || !botData) {
-        console.error("Bot account creation failed:", botError);
-        return null;
-      }
-
-      return botData.id;
+      const data = await response.json();
+      return data.success > 0 ? "success" : null;
     } catch (error) {
-      console.error("Error creating bot:", error);
       return null;
     }
   },

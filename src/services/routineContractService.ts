@@ -245,6 +245,20 @@ export const routineContractService = {
     return { data, error };
   },
 
+  async getAllRoutineContracts() {
+    const { data, error } = await supabase
+      .from("routine_contracts")
+      .select(`
+        *,
+        project:projects(id, title, category_id, subcategory_id),
+        client:profiles!routine_contracts_client_id_fkey(id, full_name, email),
+        provider:profiles!routine_contracts_provider_id_fkey(id, full_name, email)
+      `)
+      .order("created_at", { ascending: false });
+
+    return { data, error };
+  },
+
   // Calculate total recurring revenue
   calculateRecurringRevenue(routines: any[]): number {
     let totalMonthlyRevenue = 0;

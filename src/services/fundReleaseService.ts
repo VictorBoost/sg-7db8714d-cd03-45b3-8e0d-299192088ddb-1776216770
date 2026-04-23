@@ -145,4 +145,22 @@ export const fundReleaseService = {
     if (error) throw error;
     return data;
   },
+
+  async getAllFundReleases(): Promise<{ data: any[], error: any }> {
+    const { data, error } = await supabase
+      .from("fund_releases")
+      .select(`
+        *,
+        contract:contracts(
+          id, 
+          bids(agreed_price),
+          project:projects(title),
+          client:profiles!contracts_client_id_fkey(full_name, email),
+          provider:profiles!contracts_provider_id_fkey(full_name, email)
+        )
+      `)
+      .order("created_at", { ascending: false });
+      
+    return { data: data || [], error };
+  }
 };
