@@ -31,31 +31,31 @@ export default function MonaLisaPage() {
   const checkOwnerAccess = async () => {
     setCheckingOwner(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", user.id)
-        .single();
-
-      const hasAccess = profile?.email === "bluetikanz@gmail.com";
-      setIsOwner(hasAccess);
-
-      if (!hasAccess) {
+      if (response.status === 403 || !data.isAdmin || !data.isOwner) {
         toast({
           title: "Access Denied",
           description: "MonaLisa is only accessible to the platform owner.",
           variant: "destructive"
         });
         router.push("/muna");
+        return;
       }
+
+      setIsOwner(true);
     } catch (error) {
-      console.error("Failed to check owner access:", error);
+      console.error("Owner verification error:", error);
       router.push("/muna");
     } finally {
       setCheckingOwner(false);

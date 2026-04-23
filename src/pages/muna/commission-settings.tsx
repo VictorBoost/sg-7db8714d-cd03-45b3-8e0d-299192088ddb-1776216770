@@ -37,15 +37,34 @@ export default function CommissionSettingsPage() {
   }, []);
 
   async function checkAccess() {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // STRICT OWNER CHECK: Only bluetikanz@gmail.com can access this page
-    if (!user || user.email !== "bluetikanz@gmail.com") {
-      router.push("/muna");
-      return;
-    }
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
 
-    await loadData();
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin || !data.isOwner) {
+        toast({
+          title: "Access Denied",
+          description: "Commission Settings is only accessible to the platform owner.",
+          variant: "destructive"
+        });
+        router.push("/muna");
+        return;
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
+    }
   }
 
   async function loadData() {

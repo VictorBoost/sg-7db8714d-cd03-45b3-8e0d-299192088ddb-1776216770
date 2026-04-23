@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authService } from "@/services/authService";
 import { verificationService } from "@/services/verificationService";
 import { sendDocumentManuallyApproved, sendDocumentRejected } from "@/services/sesEmailService";
+import { useRouter } from "next/navigation";
 
 export default function AdminVerifyProviders() {
   const { toast } = useToast();
@@ -28,10 +29,37 @@ export default function AdminVerifyProviders() {
   const [actionType, setActionType] = useState<"approve" | "reject">("approve");
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [verificationHistory, setVerificationHistory] = useState<any[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
-    loadDocuments();
+    checkAdminAccess();
   }, []);
+
+  const checkAdminAccess = async () => {
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin) {
+        router.push("/muna");
+        return;
+      }
+
+      loadDocuments();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
+    }
+  };
 
   const loadDocuments = async () => {
     setLoading(true);

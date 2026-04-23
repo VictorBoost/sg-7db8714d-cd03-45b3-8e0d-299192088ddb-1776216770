@@ -20,31 +20,35 @@ export default function AdminRoutineContractsPage() {
   }, []);
 
   async function checkAdminAndLoadData() {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (!(profile as any)?.is_admin) {
-      router.push("/");
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to access this page.",
-        variant: "destructive"
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
       });
-      return;
-    }
 
-    setIsAdmin(true);
-    await loadRoutineContracts();
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin) {
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to access this page.",
+          variant: "destructive"
+        });
+        router.push("/muna");
+        return;
+      }
+
+      setIsAdmin(true);
+      await loadRoutineContracts();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
+    }
   }
 
   async function loadRoutineContracts() {

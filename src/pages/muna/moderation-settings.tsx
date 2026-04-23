@@ -18,27 +18,27 @@ export default function ModerationSettingsPage() {
 
   async function checkAdminAccess() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", session.user.id)
-        .single();
-
-      if (!profile?.email?.endsWith("@bluetika.co.nz")) {
-        router.push("/");
+      if (response.status === 403 || !data.isAdmin) {
+        router.push("/muna");
         return;
       }
 
       setIsAdmin(true);
     } catch (error) {
-      console.error("Admin check failed:", error);
-      router.push("/");
+      console.error("Admin verification error:", error);
+      router.push("/muna");
     } finally {
       setLoading(false);
     }

@@ -46,19 +46,31 @@ export default function BotLab() {
   const checkOwnerAccess = async () => {
     setCheckingOwner(true);
     try {
-      const hasAccess = await botLabService.checkOwnerAccess();
-      setIsOwner(hasAccess);
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await response.json();
       
-      if (!hasAccess) {
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin || !data.isOwner) {
         toast({
           title: "Access Denied",
           description: "Bot Lab is only accessible to the platform owner.",
           variant: "destructive"
         });
         router.push("/muna");
+        return;
       }
+
+      setIsOwner(true);
     } catch (error) {
-      console.error("Failed to check owner access:", error);
+      console.error("Owner verification error:", error);
       router.push("/muna");
     } finally {
       setCheckingOwner(false);

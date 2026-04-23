@@ -31,14 +31,30 @@ export default function StaffManagement() {
   }, []);
 
   const checkAdminAccess = async () => {
-    const adminStatus = await isAdminUser();
-    if (!adminStatus) {
-      router.push("/muna");
-      return;
-    }
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
 
-    setIsAdmin(true);
-    await loadData();
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin) {
+        router.push("/muna");
+        return;
+      }
+
+      setIsAdmin(true);
+      await loadData();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
+    }
   };
 
   const loadData = async () => {

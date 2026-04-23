@@ -30,16 +30,30 @@ export default function VerifyDomesticHelpers() {
   }, []);
 
   const checkAdminAccess = async () => {
-    const session = await authService.getCurrentSession();
-    if (!session?.user) {
-      router.push("/login");
-      return;
-    }
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
 
-    // For now, any authenticated user can access admin
-    // TODO: Add proper admin role checking
-    setIsAdmin(true);
-    loadVerifications();
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin) {
+        router.push("/muna");
+        return;
+      }
+
+      setIsAdmin(true);
+      loadVerifications();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
+    }
   };
 
   const loadVerifications = async () => {

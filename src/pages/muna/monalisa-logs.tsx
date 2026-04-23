@@ -24,20 +24,26 @@ export default function MonalisaLogsPage() {
   }, []);
 
   const checkOwnerAccess = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", user.id)
-      .single();
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
 
-    if (profile?.email !== "bluetikanz@gmail.com") {
-      router.push("/");
+      if (response.status === 403 || !data.isAdmin || !data.isOwner) {
+        router.push("/muna");
+        return;
+      }
+    } catch (error) {
+      console.error("Owner verification error:", error);
+      router.push("/muna");
     }
   };
 

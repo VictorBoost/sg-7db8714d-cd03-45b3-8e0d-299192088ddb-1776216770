@@ -42,14 +42,30 @@ export default function AdminDisputes() {
   }, []);
 
   const checkAdminAccess = async () => {
-    const session = await authService.getCurrentSession();
-    if (!session?.user) {
-      router.push("/login");
-      return;
-    }
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
 
-    setUserId(session.user.id);
-    loadDisputes();
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin) {
+        router.push("/muna");
+        return;
+      }
+
+      setUserId(data.email);
+      loadDisputes();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
+    }
   };
 
   const loadDisputes = async () => {

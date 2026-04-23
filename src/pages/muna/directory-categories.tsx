@@ -62,24 +62,29 @@ export default function DirectoryCategoriesAdmin() {
   }, []);
 
   const checkAuth = async () => {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) {
-      router.push("/login");
-      return;
+    try {
+      const response = await fetch("/api/auth/verify-admin", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+      
+      if (response.status === 401) {
+        router.push("/muna/login");
+        return;
+      }
+
+      if (response.status === 403 || !data.isAdmin) {
+        router.push("/muna");
+        return;
+      }
+
+      loadCategories();
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      router.push("/muna");
     }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", session.session.user.id)
-      .single();
-
-    if (!profile?.email?.endsWith("@bluetika.co.nz")) {
-      router.push("/");
-      return;
-    }
-
-    loadCategories();
   };
 
   const loadCategories = async () => {
