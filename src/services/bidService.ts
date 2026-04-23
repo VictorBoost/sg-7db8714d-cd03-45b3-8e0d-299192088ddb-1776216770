@@ -25,13 +25,13 @@ export const bidService = {
     }
 
     if ((data.project as any)?.client_id) {
-      await notificationService.createNotification({
-        user_id: (data.project as any).client_id,
-        type: "new_bid",
-        title: "New Bid Received",
-        message: `${(data.provider as any)?.full_name || "A provider"} submitted a bid of NZD $${bidData.amount}`,
-        link: `/project/${bidData.project_id}`,
-      });
+      await notificationService.createNotification(
+        (data.project as any).client_id,
+        "New Bid Received",
+        `${(data.provider as any)?.full_name || "A provider"} submitted a bid of NZD $${bidData.amount}`,
+        "info",
+        `/project/${bidData.project_id}`
+      );
     }
 
     return { data, error: null };
@@ -109,6 +109,32 @@ export const bidService = {
     }
 
     return { data: contract, error: null };
+  },
+
+  async getBidsByProject(projectId: string) {
+    const { data, error } = await supabase.from("bids").select(`*, provider:profiles!bids_provider_id_fkey(*)`).eq("project_id", projectId).order("created_at", { ascending: false });
+    return { data: data || [], error };
+  },
+
+  async getBidsByProvider(providerId: string) {
+    const { data, error } = await supabase.from("bids").select(`*, project:projects(*)`).eq("provider_id", providerId).order("created_at", { ascending: false });
+    return { data: data || [], error };
+  },
+
+  async getProviderBids(providerId: string) {
+    return this.getBidsByProvider(providerId);
+  },
+
+  async updateBid(bidId: string, updates: any) {
+    const { data, error } = await supabase.from("bids").update(updates).eq("id", bidId).select().single();
+    return { data, error };
+  },
+
+  async deleteBid(bidId: string, providerId: string) {
+    const { data: bid } = await supabase.from("bids").select("provider_id, status").eq("id", bidId).single();
+    if (!bid || bid.provider_id !== providerId) return { data: null, error: new Error("Unauthorized") };
+    const { error } = await supabase.from("bids").delete().eq("id", bidId);
+    return { data: !error, error };
   },
 
   async uploadTradeCertificate(file: File, providerId: string) {
