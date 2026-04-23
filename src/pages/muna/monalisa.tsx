@@ -65,10 +65,12 @@ export default function MonaLisaPage() {
   const loadMonaLisaStatus = async () => {
     try {
       const status = await monalisaService.getStatus();
-      setIsActive(status.is_active);
-      setLastCheck(status.last_check_at);
+      setIsActive(status?.is_active || false);
+      setLastCheck(status?.last_check_at || null);
     } catch (error) {
       console.error("Failed to load MonaLisa status:", error);
+      setIsActive(false);
+      setLastCheck(null);
     }
   };
 

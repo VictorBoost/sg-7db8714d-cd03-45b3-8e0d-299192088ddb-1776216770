@@ -9,17 +9,22 @@ export const monalisaService = {
    * Get MonaLisa status
    */
   async getStatus(): Promise<MonalisaSettings | null> {
-    const { data, error } = await supabase
-      .from("monalisa_settings")
-      .select("*")
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("monalisa_settings")
+        .select("*")
+        .single();
 
-    if (error) {
+      if (error) {
+        console.error("Error fetching MonaLisa status:", error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
       console.error("Error fetching MonaLisa status:", error);
       return null;
     }
-
-    return data;
   },
 
   /**
