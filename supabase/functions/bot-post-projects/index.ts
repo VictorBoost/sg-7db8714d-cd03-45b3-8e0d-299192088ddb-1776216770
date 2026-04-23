@@ -6,20 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Bypass attempt templates (20% of posts will include these)
-const bypassAttempts = [
-  { type: "phone", text: "Call me on 021 456 7890 for faster response" },
-  { type: "phone", text: "My mobile is 027-123-4567" },
-  { type: "phone", text: "Ring me: 09 555 1234" },
-  { type: "email", text: "Email me directly at john@gmail.com" },
-  { type: "email", text: "Contact: mike.smith@outlook.co.nz" },
-  { type: "whatsapp", text: "WhatsApp me for quick chat" },
-  { type: "whatsapp", text: "I'm on WhatsApp - easier than this site" },
-  { type: "url", text: "Check my work at mywebsite.co.nz" },
-  { type: "url", text: "See portfolio: www.designworks.nz" },
-  { type: "social", text: "Find me on Facebook - John Smith Plumbing" },
-];
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -31,10 +17,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get active client bots
     const { data: clientBots } = await supabaseClient
       .from("bot_accounts")
-      .select("profile_id, profiles!inner(full_name, city)")
+      .select("profile_id, profiles!inner(full_name, city_region)")
       .eq("bot_type", "client")
       .eq("is_active", true);
 
@@ -45,202 +30,178 @@ serve(async (req) => {
       );
     }
 
-    // Get categories and subcategories
     const { data: categories } = await supabaseClient
       .from("categories")
-      .select(`
-        id,
-        name,
-        subcategories(id, name)
-      `);
+      .select(`id, name, subcategories(id, name)`);
 
     if (!categories || categories.length === 0) {
       throw new Error("No categories found");
     }
 
+    // More human-like, realistic project templates
     const projectTemplates = [
       {
         category: "Home Maintenance",
-        titles: [
-          "Leaking tap needs fixing",
-          "Deck maintenance and oiling",
-          "Fence repair needed",
-          "Gutters need cleaning",
-          "Interior painting required"
-        ],
-        descriptions: [
-          "Kitchen tap has been dripping for weeks. Need it fixed ASAP to save on water bills.",
-          "Back deck needs sanding and oil treatment before summer. About 30 square metres.",
-          "Storm damaged a section of fence. About 5 metres needs replacing or repair.",
-          "Gutters full of leaves and debris. Two-story house, need professional with safety gear.",
-          "Three bedrooms need repainting. Walls and ceilings. Prep work included."
+        projects: [
+          {
+            title: "Kitchen tap dripping - need plumber asap",
+            description: "Hey, my kitchen tap has been dripping for about 2 weeks now and it's driving me nuts! Tried tightening it myself but no luck. Would really appreciate someone coming out this week if possible. I'm home most afternoons. Located in {city}. Cheers!",
+            budget: [80, 150],
+            urgency: "within_week"
+          },
+          {
+            title: "Back deck needs sanding and oiling before summer",
+            description: "Got a pretty big deck out back (roughly 30-35 square metres I reckon). It's looking pretty rough and winter didn't do it any favours. Want to get it sorted before the BBQ season kicks off! Happy to supply the oil if that helps with the price. Just need someone who knows what they're doing and won't leave a mess. Can do weekends or after 3pm weekdays.",
+            budget: [400, 700],
+            urgency: "flexible"
+          },
+          {
+            title: "Storm damaged fence section - about 5 metres",
+            description: "Bloody storm last week took out a section of my fence between me and the neighbour. About 5 metres worth. Some posts are still good I think but the panels are rooted. Neighbour's keen to go halves on it which is decent of him. Need someone to come have a look and give me a price. I'm in {city}, can send photos if that helps.",
+            budget: [300, 600],
+            urgency: "urgent"
+          },
+          {
+            title: "Gutter cleaning - two storey house",
+            description: "Gutters are absolutely packed with leaves and crud. Two storey house so I'm not keen on doing it myself at my age! Need someone with proper safety gear and a ladder that can handle it. While you're up there wouldn't mind if you could check the spouting is all good too. Located near the {city} CBD.",
+            budget: [150, 250],
+            urgency: "within_week"
+          },
+          {
+            title: "Interior painting - 3 bedrooms",
+            description: "Moving the kids into bigger rooms and want to freshen everything up with a coat of paint. 3 bedrooms total - walls and ceilings. Current colour is magnolia but looking to go with something a bit more modern, maybe a light grey? Prep work needed too as there's a few nail holes and marks. Got the time off work in 2 weeks so would be great to get it done then. Happy to move furniture myself to save costs.",
+            budget: [1200, 1800],
+            urgency: "flexible"
+          }
         ]
       },
       {
-        category: "Gardening & Landscaping",
-        titles: [
-          "Lawn mowing service needed",
-          "Garden bed overhaul",
-          "Tree trimming required",
-          "Hedge trimming and shaping",
-          "Basic garden maintenance"
-        ],
-        descriptions: [
-          "Large lawn needs regular mowing. Looking for fortnightly service over summer.",
-          "Front garden beds need complete redo. Remove old plants, add new soil, plant natives.",
-          "Large tree overhanging driveway needs professional trimming for safety.",
-          "Hedge along front fence needs trimming and shaping. About 15 metres long.",
-          "Regular garden maintenance needed. Weeding, pruning, general tidying."
+        category: "Gardening & Landscaping", 
+        projects: [
+          {
+            title: "Regular lawn mowing - fortnightly through summer",
+            description: "Got a fairly big section and my mower just carked it. Rather than buying a new one I figured I'd get someone in to do it properly. Looking for someone reliable who can come every 2 weeks over summer. Lawn's maybe 200sqm? Also got some edges that need doing with a trimmer. I'm usually home on weekends if that suits. {city} area.",
+            budget: [40, 70],
+            urgency: "within_week"
+          },
+          {
+            title: "Complete garden bed makeover - front yard",
+            description: "Front garden is an absolute disaster zone. Previous owners clearly didn't give a toss about it. Looking to rip everything out, get some fresh soil in, and plant some nice natives that don't need too much maintenance. Maybe 6-8 square metres total? Would love some suggestions on what plants would work well. I'm hopeless with gardening so the more low-maintenance the better!",
+            budget: [500, 900],
+            urgency: "flexible"
+          },
+          {
+            title: "Massive tree overhanging driveway needs trimming",
+            description: "We've got this huge tree that's started dropping branches all over the driveway and I'm worried one's gonna come down on the car. Needs a professional with the right gear - it's pretty high up. Also some branches are touching the power lines which makes me nervous. Located in {city}. Can someone come have a look and give me a quote?",
+            budget: [300, 600],
+            urgency: "urgent"
+          }
         ]
       },
       {
         category: "Cleaning",
-        titles: [
-          "End of tenancy clean",
-          "Regular house cleaning",
-          "Deep clean needed",
-          "Window cleaning required",
-          "Carpet steam cleaning"
-        ],
-        descriptions: [
-          "Moving out next week. Need full house clean to get bond back. 3 bedroom house.",
-          "Looking for reliable cleaner for weekly house clean. 2 bedroom flat.",
-          "Spring clean needed! Haven't done a proper deep clean in months. Help!",
-          "All windows inside and out need cleaning. Two story house, about 20 windows.",
-          "Carpets in lounge and bedrooms need steam cleaning. About 60 square metres."
+        projects: [
+          {
+            title: "End of tenancy clean - need bond back!",
+            description: "Moving out next Friday and the rental agreement says it needs to be professionally cleaned. 3 bedroom house, 1 bathroom, decent sized living area. Kitchen needs a good going over, oven's pretty gross if I'm honest. Carpets could probably do with a vacuum but that's included in normal cleaning right? Really need the bond back so want to make sure it's done properly. {city} location.",
+            budget: [250, 400],
+            urgency: "urgent"
+          },
+          {
+            title: "Weekly house clean - 2 bed flat",
+            description: "Both my partner and I work long hours and the flat's getting away on us. Looking for someone to come in once a week - maybe Wednesday or Thursday? Just general cleaning, bathrooms, kitchen, vacuum, that sort of thing. We're pretty tidy people so shouldn't be too much work. Would prefer the same person each week if possible. Must be reliable!",
+            budget: [80, 120],
+            urgency: "within_week"
+          },
+          {
+            title: "Deep clean needed - haven't done one in ages",
+            description: "Okay so I'll be honest, it's been a while since I did a proper deep clean and the place needs it. Every nook and cranny type of clean. Windows, skirting boards, behind the fridge, all that stuff I normally avoid! One bedroom unit, not massive but definitely needs someone who's thorough. I'll be out for the day so you can blast through it without me getting in the way.",
+            budget: [180, 280],
+            urgency: "flexible"
+          }
         ]
       },
       {
         category: "Moving & Delivery",
-        titles: [
-          "House move assistance",
-          "Furniture delivery help",
-          "Rubbish removal needed",
-          "Small item delivery",
-          "Moving heavy items"
-        ],
-        descriptions: [
-          "Moving to new house across town. Need help loading and unloading truck.",
-          "Bought new couch, needs picking up from store and delivering to home.",
-          "Garage full of junk needs removing and taking to dump. One trailer load.",
-          "Need someone to pick up marketplace purchases and deliver to my place.",
-          "Piano needs moving to upstairs bedroom. Need professionals with right equipment."
+        projects: [
+          {
+            title: "House move help - same suburb",
+            description: "Moving house in 2 weeks, just across {city} to a new rental. Got a truck sorted but could really do with an extra set of hands (or two?) for loading and unloading. Mainly furniture and boxes. It's a 2 bedroom place, no piano or anything crazy heavy. Probably 3-4 hours work total? Will provide lunch and drinks! Cheers.",
+            budget: [150, 250],
+            urgency: "within_week"
+          },
+          {
+            title: "Couch delivery from The Warehouse",
+            description: "Bought a new couch from The Warehouse but their delivery fee is mental! Need someone to pick it up and bring it to mine in {city}. It's a 3 seater, nothing too massive. Ground floor flat so easy access. I can help carry it in. Would need to do it this weekend if possible as that's when I can be home.",
+            budget: [50, 100],
+            urgency: "urgent"
+          },
+          {
+            title: "Garage clearout - rubbish to dump",
+            description: "Finally getting around to clearing out the garage and there's SO much junk that needs to go to the tip. Reckon it's about a trailer load, maybe a bit more. Old furniture, broken stuff, garden waste, you name it. Need someone with a trailer who can load it up and take it away. I'll help load if needed. {city} area.",
+            budget: [100, 200],
+            urgency: "flexible"
+          }
         ]
       },
       {
         category: "Handyman Services",
-        titles: [
-          "Various odd jobs",
-          "Flatpack furniture assembly",
-          "Door lock replacement",
-          "Shelf installation",
-          "General repairs needed"
-        ],
-        descriptions: [
-          "Got a list of small jobs around the house. Keen for someone to knock them all out in one go.",
-          "Four pieces of flatpack furniture need assembling. IKEA Billy bookcases and desk.",
-          "Front door lock is playing up. Need it replaced with a good quality lock.",
-          "Want floating shelves installed in living room. Got the brackets, need expert installation.",
-          "Various small repairs: squeaky door, loose tap, cracked tile, wobbly bannister."
-        ]
-      },
-      {
-        category: "Pet Care",
-        titles: [
-          "Dog walking service",
-          "Pet sitting while away",
-          "Daily cat feeding",
-          "Dog grooming needed",
-          "Pet care during holidays"
-        ],
-        descriptions: [
-          "Need reliable dog walker for weekday walks. Labrador, friendly but energetic!",
-          "Going away for two weeks. Need someone to stay at house and look after our cat.",
-          "Work long hours. Need someone to feed cat and spend some time with her daily.",
-          "Dog needs grooming - wash, brush, nail trim. Medium-sized mixed breed.",
-          "Summer holiday coming up. Need trustworthy person to look after our pets."
-        ]
-      },
-      {
-        category: "Tutoring",
-        titles: [
-          "Maths tutoring needed",
-          "NCEA English help",
-          "Guitar lessons wanted",
-          "Science tutoring required",
-          "Reading assistance"
-        ],
-        descriptions: [
-          "Year 10 student struggling with algebra. Need patient tutor for weekly sessions.",
-          "NCEA Level 2 English support needed. Essay writing and text analysis help.",
-          "Complete beginner wants to learn guitar. Looking for patient teacher.",
-          "Year 11 student needs help with physics and chemistry. Exam prep focus.",
-          "Child in Year 3 needs reading support. Friendly, encouraging tutor preferred."
-        ]
-      },
-      {
-        category: "Event Help",
-        titles: [
-          "Party setup help",
-          "Event cleanup needed",
-          "BBQ chef for party",
-          "Waitstaff for function",
-          "Photographer for event"
-        ],
-        descriptions: [
-          "Birthday party this Saturday. Need help setting up marquee, tables, chairs.",
-          "After party cleanup needed. About 50 guests, will need good 2-3 hours work.",
-          "Hosting BBQ for 30 people. Looking for experienced BBQ chef to handle cooking.",
-          "Cocktail party needs 2-3 waitstaff for serving drinks and canapes.",
-          "Family reunion needs photographer. Casual outdoor event, about 3 hours coverage."
+        projects: [
+          {
+            title: "Bunch of odd jobs around the house",
+            description: "Got a growing list of little jobs that keep getting pushed to the bottom of the to-do list. Nothing huge but they're starting to add up: squeaky door, wobbly bannister, couple of loose tiles, tap that's a bit stiff, shelf that needs mounting. Would love someone to just come and smash through them all in one go. Got all the parts and screws and stuff, just need someone who actually knows what they're doing! {city}.",
+            budget: [150, 300],
+            urgency: "flexible"
+          },
+          {
+            title: "Flatpack furniture assembly - IKEA Billy bookcases",
+            description: "Ordered 4 Billy bookcases from IKEA for my home office and I absolutely cannot be bothered assembling them. Did one once and it took me 3 hours and looked wonky. Would rather just pay someone who does this all the time. All the boxes are in the spare room ready to go. Should be pretty straightforward job for someone with experience.",
+            budget: [80, 150],
+            urgency: "within_week"
+          },
+          {
+            title: "Front door lock replacement - playing up",
+            description: "Front door lock is getting harder and harder to turn and yesterday I nearly got locked out! Definitely needs replacing before it totally fails. Would prefer a good quality lock, doesn't need to be fancy but I want something solid. {city} area. Can someone come have a look and give me a price? Happy to supply the lock or you can source it, whatever's easier.",
+            budget: [120, 250],
+            urgency: "urgent"
+          }
         ]
       }
     ];
 
     const results = {
       created: 0,
-      bypassAttempts: 0,
       errors: [] as string[]
     };
 
-    // Each bot posts 5-8 projects
+    // Each bot posts 5-8 projects with realistic, human-like content
     for (const bot of clientBots) {
-      const numProjects = Math.floor(Math.random() * 4) + 5; // 5-8 projects
+      const numProjects = Math.floor(Math.random() * 4) + 5;
       
       for (let i = 0; i < numProjects; i++) {
         try {
           const template = projectTemplates[Math.floor(Math.random() * projectTemplates.length)];
-          const titleIndex = Math.floor(Math.random() * template.titles.length);
-          let title = template.titles[titleIndex];
-          let description = template.descriptions[titleIndex];
+          const project = template.projects[Math.floor(Math.random() * template.projects.length)];
           
-          // 20% of posts include bypass attempts
-          const shouldBypass = Math.random() < 0.2;
-          let bypassType = null;
-          let bypassContent = null;
-
-          if (shouldBypass) {
-            const bypass = bypassAttempts[Math.floor(Math.random() * bypassAttempts.length)];
-            description += ` ${bypass.text}`;
-            bypassType = bypass.type;
-            bypassContent = bypass.text;
-            results.bypassAttempts++;
-          }
-
+          const title = project.title;
+          const city = (bot.profiles as any)?.city_region || "Auckland";
+          const description = project.description.replace("{city}", city);
+          
           const category = categories.find(c => c.name === template.category);
           if (!category) continue;
 
-          const budget = Math.floor(Math.random() * 450) + 50; // $50-$500
-          const urgency = ["flexible", "within_week", "urgent"][Math.floor(Math.random() * 3)];
+          const budgetMin = project.budget[0];
+          const budgetMax = project.budget[1];
+          const budget = Math.floor(Math.random() * (budgetMax - budgetMin) + budgetMin);
 
-          const { data: project, error: projectError } = await supabaseClient
+          const { data: newProject, error: projectError } = await supabaseClient
             .from("projects")
             .insert({
               title,
               description,
               category_id: category.id,
               budget,
-              urgency,
+              urgency: project.urgency,
               client_id: bot.profile_id,
               status: "open"
             })
@@ -252,51 +213,33 @@ serve(async (req) => {
             continue;
           }
 
-          // Log bypass attempt if one was made
-          if (shouldBypass && bypassType && bypassContent && project) {
-            await supabaseClient
-              .from("bot_bypass_attempts")
-              .insert({
-                bot_profile_id: bot.profile_id,
-                attempt_type: bypassType,
-                content_snippet: bypassContent,
-                detection_status: "pending", // Will be updated when moderation runs
-                project_id: project.id
-              });
-          }
-
-          // Log activity
           await supabaseClient
             .from("bot_activity_logs")
             .insert({
               bot_id: bot.profile_id,
-              action_type: "project_posted",
-              details: { 
-                project_title: title,
-                bypass_attempt: shouldBypass ? bypassType : null
-              }
+              action_type: "post_project",
+              details: { project_title: title }
             });
 
           results.created++;
-        } catch (err) {
+        } catch (err: any) {
           results.errors.push(`Error creating project: ${err.message}`);
         }
       }
     }
 
-    console.log(`Created ${results.created} projects (${results.bypassAttempts} with bypass attempts) with ${results.errors.length} errors`);
+    console.log(`Created ${results.created} human-like projects with ${results.errors.length} errors`);
 
     return new Response(
       JSON.stringify({
         success: true,
         created: results.created,
-        bypassAttempts: results.bypassAttempts,
         errors: results.errors
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Fatal error:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),

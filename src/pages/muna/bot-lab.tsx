@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function BotLab() {
   const router = useRouter();
@@ -36,6 +37,9 @@ export default function BotLab() {
   const [isTogglingPayments, setIsTogglingPayments] = useState(false);
   const [bypassLogs, setBypassLogs] = useState<any>(null);
   const [loadingBypass, setLoadingBypass] = useState(false);
+  const [triggeringProjects, setTriggeringProjects] = useState(false);
+  const [triggeringBids, setTriggeringBids] = useState(false);
+  const [triggeringPayments, setTriggeringPayments] = useState(false);
 
   useEffect(() => {
     checkOwnerAccess();
@@ -253,6 +257,82 @@ export default function BotLab() {
       });
     } finally {
       setIsKilling(false);
+    }
+  };
+
+  const handleTriggerProjects = async () => {
+    setTriggeringProjects(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("bot-post-projects");
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Projects Posted",
+        description: `Bots created ${data?.created || 0} new projects!`,
+      });
+      
+      await loadStats();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to trigger project posting",
+        variant: "destructive",
+      });
+    } finally {
+      setTriggeringProjects(false);
+    }
+  };
+
+  const handleTriggerBids = async () => {
+    setTriggeringBids(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("bot-submit-bids");
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Bids Submitted",
+        description: `Bots submitted ${data?.created || 0} new bids!`,
+      });
+      
+      await loadStats();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to trigger bid submission",
+        variant: "destructive",
+      });
+    } finally {
+      setTriggeringBids(false);
+    }
+  };
+
+  const handleTriggerPayments = async () => {
+    setTriggeringPayments(true);
+    try {
+      // First accept bids
+      const { data: acceptData, error: acceptError } = await supabase.functions.invoke("bot-accept-bids");
+      if (acceptError) throw acceptError;
+
+      // Then complete payments
+      const { data: payData, error: payError } = await supabase.functions.invoke("bot-complete-contracts");
+      if (payError) throw payError;
+      
+      toast({
+        title: "Bot Activity Complete",
+        description: `Accepted ${acceptData?.accepted || 0} bids, processed ${payData?.paid || 0} payments!`,
+      });
+      
+      await loadStats();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to trigger payments",
+        variant: "destructive",
+      });
+    } finally {
+      setTriggeringPayments(false);
     }
   };
 
@@ -486,6 +566,68 @@ export default function BotLab() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="border-accent">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-accent" />
+                Quick Actions - Activate Marketplace Now
+              </CardTitle>
+              <CardDescription>
+                Manually trigger bot activity to make your marketplace busy and active immediately
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4">
+                <Button
+                  onClick={handleTriggerProjects}
+                  disabled={triggeringProjects || !automationStatus?.isActive}
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                >
+                  {triggeringProjects ? "Posting..." : "📝 Post Projects (5-8 per bot)"}
+                </Button>
+                
+                <Button
+                  onClick={handleTriggerBids}
+                  disabled={triggeringBids || !automationStatus?.isActive}
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                >
+                  {triggeringBids ? "Bidding..." : "💰 Submit Bids (1-2 per bot)"}
+                </Button>
+                
+                <Button
+                  onClick={handleTriggerPayments}
+                  disabled={triggeringPayments || !automationStatus?.isActive || !automationStatus?.paymentsEnabled}
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                >
+                  {triggeringPayments ? "Processing..." : "💳 Accept & Pay (Test Cards)"}
+                </Button>
+              </div>
+              
+              {!automationStatus?.isActive && (
+                <Alert className="mt-4 border-yellow-500 bg-yellow-500/10">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <AlertDescription className="text-yellow-600">
+                    Enable bot automation above to activate these quick actions
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {!automationStatus?.paymentsEnabled && automationStatus?.isActive && (
+                <Alert className="mt-4 border-blue-500 bg-blue-500/10">
+                  <AlertDescription className="text-blue-600">
+                    Bot payments are disabled. Enable to allow contract acceptance and payments.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Security Test Dashboard */}
           <Card className="mb-8">

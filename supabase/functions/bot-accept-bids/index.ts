@@ -1,12 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-serve(async (req) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -27,103 +27,102 @@ serve(async (req) => {
     if (!paymentSetting || paymentSetting.setting_value !== "true") {
       return new Response(
         JSON.stringify({ 
-          success: true, 
-          message: "Bot payments disabled - bids not accepted",
-          accepted: 0 
+          success: true,
+          message: "Bot payments disabled - skipping bid acceptance" 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Get active provider bots
-    const { data: providerBots } = await supabaseClient
-      .from("bot_accounts")
-      .select("profile_id")
-      .eq("is_active", true)
-      .eq("bot_type", "provider");
-
-    if (!providerBots || providerBots.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, message: "No provider bots available", accepted: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const providerBotIds = providerBots.map(b => b.profile_id);
-
-    // Get pending bids from bot providers on bot client projects
-    const { data: bids } = await supabaseClient
-      .from("bids")
+    // Get open projects with bids from bot clients
+    const { data: projects } = await supabaseClient
+      .from("projects")
       .select(`
         id,
-        provider_id,
-        project_id,
-        bid_amount,
-        projects!inner(client_id)
+        title,
+        client_id,
+        bids!inner(
+          id,
+          amount,
+          provider_id,
+          status
+        )
       `)
-      .eq("status", "pending")
-      .in("provider_id", providerBotIds)
-      .limit(10);
+      .eq("status", "open")
+      .eq("bids.status", "pending");
 
-    if (!bids || bids.length === 0) {
+    if (!projects || projects.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "No pending bids to accept", accepted: 0 }),
+        JSON.stringify({ success: true, message: "No projects with pending bids" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    let acceptedCount = 0;
-    const errors = [];
+    const results = {
+      accepted: 0,
+      errors: [] as string[]
+    };
 
-    // Accept random bids (50% acceptance rate)
-    for (const bid of bids) {
-      if (Math.random() > 0.5) continue;
-
+    // Accept bids with 30% probability
+    for (const project of projects) {
       try {
-        // Accept the bid
-        const { error: bidError } = await supabaseClient
-          .from("bids")
-          .update({ status: "accepted" })
-          .eq("id", bid.id);
+        if (Math.random() > 0.3) continue; // 30% chance to accept
 
-        if (bidError) {
-          errors.push(`Bid ${bid.id}: ${bidError.message}`);
+        const bids = Array.isArray(project.bids) ? project.bids : [project.bids];
+        if (bids.length === 0) continue;
+
+        // Pick a random bid (bots don't always pick the cheapest!)
+        const selectedBid = bids[Math.floor(Math.random() * bids.length)];
+
+        // Create contract
+        const { data: contract, error: contractError } = await supabaseClient
+          .from("contracts")
+          .insert({
+            project_id: project.id,
+            bid_id: selectedBid.id,
+            client_id: project.client_id,
+            provider_id: selectedBid.provider_id,
+            agreed_price: selectedBid.amount,
+            status: "awaiting_payment"
+          })
+          .select()
+          .single();
+
+        if (contractError || !contract) {
+          results.errors.push(`Contract creation failed: ${contractError?.message}`);
           continue;
         }
 
-        // Create contract
-        const { error: contractError } = await supabaseClient
-          .from("contracts")
-          .insert({
-            project_id: bid.project_id,
-            bid_id: bid.id,
-            client_id: (bid.projects as any).client_id,
-            provider_id: bid.provider_id,
-            agreed_amount: bid.bid_amount,
-            final_amount: bid.bid_amount,
-            status: "awaiting_payment"
-          });
+        // Update bid and project status
+        await supabaseClient.from("bids").update({ status: "accepted" }).eq("id", selectedBid.id);
+        await supabaseClient.from("bids").update({ status: "declined" }).eq("project_id", project.id).neq("id", selectedBid.id);
+        await supabaseClient.from("projects").update({ status: "in_progress" }).eq("id", project.id);
 
-        if (contractError) {
-          errors.push(`Contract for bid ${bid.id}: ${contractError.message}`);
-        } else {
-          acceptedCount++;
-        }
-      } catch (err) {
-        errors.push(`Unexpected error for bid ${bid.id}: ${err.message}`);
+        // Log activity
+        await supabaseClient.from("bot_activity_logs").insert({
+          bot_id: project.client_id,
+          action_type: "accept_bid",
+          details: { contract_id: contract.id, bid_amount: selectedBid.amount }
+        });
+
+        results.accepted++;
+      } catch (err: any) {
+        results.errors.push(`Error accepting bid: ${err.message}`);
       }
     }
+
+    console.log(`Accepted ${results.accepted} bids with ${results.errors.length} errors`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        accepted: acceptedCount,
-        errors: errors.length > 0 ? errors : undefined
+        accepted: results.accepted,
+        errors: results.errors
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Fatal error:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
