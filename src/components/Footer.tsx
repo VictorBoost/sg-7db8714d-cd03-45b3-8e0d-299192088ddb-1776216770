@@ -74,7 +74,7 @@ export function Footer() {
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm font-semibold">
-              100% NZ Owned · Kiwis Helping Kiwis · bluetika.co.nz
+              100% NZ Owned · Kiwis Helping Kiwis · <Link href="/terms" className="hover:text-teal-400 transition-colors">Terms</Link> · <Link href="/privacy" className="hover:text-teal-400 transition-colors">Privacy</Link> · bluetika.co.nz
             </p>
             <p className="text-sm text-gray-400">
               © {new Date().getFullYear()} BlueTika. All rights reserved.
