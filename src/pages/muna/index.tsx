@@ -241,65 +241,79 @@ export default function ControlCentre() {
   const checkPlatformAccess = async () => {
     setIsLoading(true);
     
-    // Check if user has active BlueTika platform session
-    const session = await authService.getCurrentSession();
-    
-    if (!session) {
-      // Not logged into platform - redirect to login
-      router.push("/login?redirect=/muna");
-      return;
-    }
+    try {
+      // Check if user has active BlueTika platform session
+      const session = await authService.getCurrentSession();
+      
+      console.log("Session check result:", session);
+      
+      if (!session) {
+        console.log("No session found - redirecting to login");
+        // Not logged into platform - redirect to login
+        router.push("/login?redirect=/muna");
+        return;
+      }
 
-    // Check if user is admin (owner or staff)
-    const isAdmin = await isAdminUser();
-    
-    if (!isAdmin) {
-      // Logged in but not admin - show access denied
+      // Check if user is admin (owner or staff)
+      const isAdmin = await isAdminUser();
+      
+      console.log("Admin check result:", isAdmin);
+      
+      if (!isAdmin) {
+        console.log("User is not admin - showing access denied");
+        // Logged in but not admin - show access denied
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // User is authenticated and is admin
+      const info = await getAdminUserInfo();
+      console.log("Admin info:", info);
+      
+      setAdminInfo(info);
+      setIsAuthenticated(true);
+      setIsLoading(false);
+      loadStats();
+      
+      // Send email alert to owner on successful admin login
+      if (info?.email) {
+        const ipAddress = await fetch("https://api.ipify.org?format=json")
+          .then(r => r.json())
+          .then(d => d.ip)
+          .catch(() => "unknown");
+
+        // Log successful admin login
+        await supabase.from("admin_login_logs").insert({
+          email: info.email,
+          success: true,
+          ip_address: ipAddress,
+          user_agent: navigator.userAgent,
+        });
+
+        // Send email alert to owner
+        try {
+          await fetch("/api/send-admin-login-alert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              adminEmail: info.email,
+              ipAddress,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+        } catch (err) {
+          console.error("Failed to send login alert:", err);
+        }
+      }
+      
+      if (info?.isOwner) {
+        loadMonalisaStatus();
+      }
+    } catch (error) {
+      console.error("Error in checkPlatformAccess:", error);
       setIsAuthenticated(false);
       setIsLoading(false);
-      return;
-    }
-
-    // User is authenticated and is admin
-    const info = await getAdminUserInfo();
-    setAdminInfo(info);
-    setIsAuthenticated(true);
-    setIsLoading(false);
-    loadStats();
-    
-    // Send email alert to owner on successful admin login
-    if (info?.email) {
-      const ipAddress = await fetch("https://api.ipify.org?format=json")
-        .then(r => r.json())
-        .then(d => d.ip)
-        .catch(() => "unknown");
-
-      // Log successful admin login
-      await supabase.from("admin_login_logs").insert({
-        email: info.email,
-        success: true,
-        ip_address: ipAddress,
-        user_agent: navigator.userAgent,
-      });
-
-      // Send email alert to owner
-      try {
-        await fetch("/api/send-admin-login-alert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            adminEmail: info.email,
-            ipAddress,
-            timestamp: new Date().toISOString(),
-          }),
-        });
-      } catch (err) {
-        console.error("Failed to send login alert:", err);
-      }
-    }
-    
-    if (info?.isOwner) {
-      loadMonalisaStatus();
     }
   };
 

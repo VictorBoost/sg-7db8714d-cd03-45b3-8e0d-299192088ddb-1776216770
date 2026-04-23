@@ -206,24 +206,37 @@ const OWNER_EMAIL = "bluetikanz@gmail.com";
 
 export async function isAdminUser(): Promise<boolean> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    console.log("isAdminUser - getUser result:", { user, error });
+    
+    if (error) {
+      console.error("isAdminUser - getUser error:", error);
+      return false;
+    }
     
     if (!user?.email) {
+      console.log("isAdminUser - no user email found");
       return false;
     }
 
+    console.log("isAdminUser - checking email:", user.email);
+
     // Check if owner
     if (user.email === OWNER_EMAIL) {
+      console.log("isAdminUser - is OWNER");
       return true;
     }
 
     // Check if active staff member
-    const { data: staff } = await supabase
+    const { data: staff, error: staffError } = await supabase
       .from("staff")
       .select("id")
       .eq("email", user.email)
       .eq("is_active", true)
       .single();
+
+    console.log("isAdminUser - staff check:", { staff, staffError });
 
     return !!staff;
   } catch (error) {
@@ -234,14 +247,23 @@ export async function isAdminUser(): Promise<boolean> {
 
 export async function getAdminUserInfo(): Promise<{ email: string; isOwner: boolean; role?: string } | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    console.log("getAdminUserInfo - getUser result:", { user, error });
+    
+    if (error) {
+      console.error("getAdminUserInfo - getUser error:", error);
+      return null;
+    }
     
     if (!user?.email) {
+      console.log("getAdminUserInfo - no user email");
       return null;
     }
 
     // Check if owner
     if (user.email === OWNER_EMAIL) {
+      console.log("getAdminUserInfo - user is OWNER");
       return {
         email: user.email,
         isOwner: true
@@ -249,12 +271,14 @@ export async function getAdminUserInfo(): Promise<{ email: string; isOwner: bool
     }
 
     // Check if active staff member
-    const { data: staff } = await supabase
+    const { data: staff, error: staffError } = await supabase
       .from("staff")
       .select("role")
       .eq("email", user.email)
       .eq("is_active", true)
       .single();
+
+    console.log("getAdminUserInfo - staff check:", { staff, staffError });
 
     if (staff) {
       return {
