@@ -232,7 +232,7 @@ export const monalisaService = {
         if (log.action_type && log.severity !== "info") {
           const key = log.action_type;
           if (!issueMap[key]) {
-            issueMap[key] = { count: 0, description: log.details || "No description" };
+            issueMap[key] = { count: 0, description: log.description || "No description" };
           }
           issueMap[key].count++;
         }
@@ -367,7 +367,8 @@ export const monalisaService = {
         await supabase.from("monalisa_logs").insert({
           action_type: "weekly_summary",
           severity: "info",
-          details: `Weekly summary sent for ${summary.weekStartDate} - ${summary.weekEndDate}`
+          title: "Weekly Summary Sent",
+          description: `Weekly summary sent for ${summary.weekStartDate} - ${summary.weekEndDate}`
         });
       }
 

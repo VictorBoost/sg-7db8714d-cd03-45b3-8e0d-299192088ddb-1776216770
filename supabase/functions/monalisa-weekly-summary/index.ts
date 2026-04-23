@@ -87,7 +87,7 @@ serve(async (req) => {
       if (log.action_type && log.severity !== "info") {
         const key = log.action_type;
         if (!issueMap[key]) {
-          issueMap[key] = { count: 0, description: log.details || "No description" };
+          issueMap[key] = { count: 0, description: log.description || "No description" };
         }
         issueMap[key].count++;
       }
@@ -149,7 +149,8 @@ serve(async (req) => {
     await supabaseClient.from("monalisa_logs").insert({
       action_type: "weekly_summary",
       severity: "info",
-      details: `Weekly summary ${emailSuccess ? 'sent' : 'failed'} for ${weekStartDate} - ${weekEndDate}`
+      title: "Weekly Summary Attempt",
+      description: `Weekly summary ${emailSuccess ? 'sent' : 'failed'} for ${weekStartDate} - ${weekEndDate}`
     });
 
     console.log("MonaLisa Weekly Summary: Complete", { emailSuccess });
