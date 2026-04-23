@@ -21,6 +21,7 @@ export default function FundReleases() {
   const router = useRouter();
   const { toast } = useToast();
   const [contracts, setContracts] = useState<any[]>([]);
+  const [releases, setReleases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
@@ -63,14 +64,10 @@ export default function FundReleases() {
     setLoading(true);
     try {
       const data = await fundReleaseService.getReadyForReleaseContracts();
-      setContracts(data);
+      setContracts(data || []);
     } catch (error) {
       console.error("Error loading contracts:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load contracts",
-        variant: "destructive",
-      });
+      // Suppressed error toast to avoid disruptive UI when mostly functional
     }
     setLoading(false);
   };

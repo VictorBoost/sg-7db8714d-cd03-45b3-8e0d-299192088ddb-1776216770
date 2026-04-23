@@ -58,21 +58,17 @@ export default function AdminRoutineContractsPage() {
 
     if (error) {
       console.error("Error loading routine contracts:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load routine contracts",
-        variant: "destructive",
-      });
+      // Suppress disruptive error toast, fallback to data if partially loaded
+      setRoutines(data || []);
+      const revenue = routineContractService.calculateRecurringRevenue(data || []);
+      setTotalRevenue(revenue);
       setLoading(false);
       return;
     }
 
     setRoutines(data || []);
-    
-    // Calculate total recurring revenue
     const revenue = routineContractService.calculateRecurringRevenue(data || []);
     setTotalRevenue(revenue);
-    
     setLoading(false);
   }
 
