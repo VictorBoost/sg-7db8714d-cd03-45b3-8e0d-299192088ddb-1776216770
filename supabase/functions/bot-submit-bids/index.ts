@@ -6,16 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Bypass attempt templates for bid messages (15% of bids)
-const bypassAttempts = [
-  { type: "phone", text: "Text me on 021 789 1234 to discuss" },
-  { type: "phone", text: "Call 027-555-9876 anytime" },
-  { type: "email", text: "Email me: tradesman@gmail.com" },
-  { type: "whatsapp", text: "I'm on WhatsApp - much easier" },
-  { type: "url", text: "Check my reviews at tradesmenreviews.co.nz" },
-  { type: "social", text: "Message me on Facebook for quick reply" },
-];
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -27,168 +17,106 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get active service provider bots
     const { data: providerBots } = await supabaseClient
       .from("bot_accounts")
-      .select("profile_id, profiles!inner(full_name)")
-      .eq("bot_type", "service_provider")
+      .select("profile_id, profiles!inner(full_name, city_region)")
+      .eq("bot_type", "provider")
       .eq("is_active", true);
 
     if (!providerBots || providerBots.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "No active provider bots found" }),
+        JSON.stringify({ success: true, message: "No active provider bots" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Get open projects from other bots that don't have many bids yet
     const { data: openProjects } = await supabaseClient
       .from("projects")
-      .select(`
-        id,
-        title,
-        budget,
-        client_id,
-        bids(id)
-      `)
+      .select("id, title, budget, client_id")
       .eq("status", "open")
-      .in("client_id", (await supabaseClient
-        .from("bot_accounts")
-        .select("profile_id")
-        .eq("is_active", true)
-      ).data?.map(b => b.profile_id) || []);
+      .limit(100);
 
     if (!openProjects || openProjects.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "No open bot projects found" }),
+        JSON.stringify({ success: true, message: "No open projects found" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const bidMessages = [
-      "Happy to help with this job. I have plenty of experience and can start right away.",
-      "I'm available and keen to take this on. Fair pricing and quality work guaranteed.",
-      "This is exactly the sort of work I specialise in. Can provide references if needed.",
-      "I'd be perfect for this job. Local, reliable, and reasonably priced.",
-      "I can definitely help with this. Been doing similar work for years.",
-      "Would love to take this on. I'm thorough, professional, and fair with pricing.",
-      "I'm interested in this job. Can fit you in this week if needed.",
-      "This looks straightforward. I have all the right gear and experience.",
-      "Keen to help out. I'm local and can give you a great price.",
-      "I've done heaps of these jobs. Would be happy to sort this for you."
+      "Hi there! I've done similar work in the area and would love to help. I'm available this week and can start ASAP. Let me know if you'd like to discuss details. Cheers!",
+      "Hey, this sounds right up my alley. I've got {years} years experience and can definitely get this sorted for you. Free to chat anytime if you want to go over specifics.",
+      "G'day! Keen to quote on this job. I'm local to {city} so can come have a look whenever suits. No obligation, happy to give you a fair price.",
+      "Hi! I'd be interested in this one. I've done heaps of these jobs and can guarantee quality work. Available to start next week if that works for you?",
+      "Hey mate, reckon I can help you out with this. I'm pretty flexible with timing and my rates are competitive. Drop me a message if you want to chat about it.",
+      "Hello! This is exactly the kind of work I specialize in. I'm based in {city} and can come by for a free quote. All work guaranteed, references available.",
+      "Hi, I'd love to take this on. Got all the gear and experience needed. Can work around your schedule too. Let me know if you'd like to discuss!",
+      "G'day! Happy to give you a hand with this. I'm reliable, tidy, and won't leave you with a mess. Been doing this for years. Keen to hear from you."
     ];
 
-    const results = {
-      created: 0,
-      bypassAttempts: 0,
-      errors: [] as string[]
-    };
+    const results = { created: 0, errors: [] as string[] };
 
-    // Each provider bot bids on 2-3 random projects
-    for (const provider of providerBots) {
-      const numBids = Math.floor(Math.random() * 2) + 2; // 2-3 bids
-      const availableProjects = openProjects
-        .filter(p => p.client_id !== provider.profile_id) // Don't bid on own projects
-        .filter(p => (p.bids as any[]).length < 5); // Only bid on projects with <5 bids
+    for (const bot of providerBots) {
+      const numBids = Math.floor(Math.random() * 2) + 1;
+      const shuffled = [...openProjects].sort(() => Math.random() - 0.5);
+      const projectsToBeOn = shuffled.slice(0, numBids);
 
-      if (availableProjects.length === 0) continue;
-
-      for (let i = 0; i < Math.min(numBids, availableProjects.length); i++) {
+      for (const project of projectsToBeOn) {
         try {
-          const project = availableProjects[Math.floor(Math.random() * availableProjects.length)];
-          
-          // Check if already bid on this project
-          const { data: existingBid } = await supabaseClient
+          const { data: existing } = await supabaseClient
             .from("bids")
             .select("id")
             .eq("project_id", project.id)
-            .eq("provider_id", provider.profile_id)
-            .single();
+            .eq("provider_id", bot.profile_id)
+            .maybeSingle();
 
-          if (existingBid) continue; // Skip if already bid
+          if (existing) continue;
 
-          // Bid amount: 80-120% of project budget
-          const budgetMultiplier = 0.8 + Math.random() * 0.4;
-          const bidAmount = Math.round(project.budget * budgetMultiplier);
-          let message = bidMessages[Math.floor(Math.random() * bidMessages.length)];
+          const baseAmount = project.budget || 200;
+          const variation = Math.random() * 0.3 - 0.15;
+          const bidAmount = Math.max(50, Math.round(baseAmount * (1 + variation)));
 
-          // 15% of bids include bypass attempts
-          const shouldBypass = Math.random() < 0.15;
-          let bypassType = null;
-          let bypassContent = null;
+          const years = Math.floor(Math.random() * 10) + 3;
+          const city = (bot.profiles as any)?.city_region || "Auckland";
+          const message = bidMessages[Math.floor(Math.random() * bidMessages.length)]
+            .replace("{years}", years.toString())
+            .replace("{city}", city);
 
-          if (shouldBypass) {
-            const bypass = bypassAttempts[Math.floor(Math.random() * bypassAttempts.length)];
-            message += ` ${bypass.text}`;
-            bypassType = bypass.type;
-            bypassContent = bypass.text;
-            results.bypassAttempts++;
-          }
-
-          const { data: bid, error: bidError } = await supabaseClient
+          const { error: bidError } = await supabaseClient
             .from("bids")
             .insert({
               project_id: project.id,
-              provider_id: provider.profile_id,
+              provider_id: bot.profile_id,
               amount: bidAmount,
               message,
               status: "pending"
-            })
-            .select()
-            .single();
+            });
 
           if (bidError) {
             results.errors.push(`Bid creation failed: ${bidError.message}`);
             continue;
           }
 
-          // Log bypass attempt if one was made
-          if (shouldBypass && bypassType && bypassContent && bid) {
-            await supabaseClient
-              .from("bot_bypass_attempts")
-              .insert({
-                bot_profile_id: provider.profile_id,
-                attempt_type: bypassType,
-                content_snippet: bypassContent,
-                detection_status: "pending",
-                bid_id: bid.id
-              });
-          }
-
-          // Log activity
           await supabaseClient
             .from("bot_activity_logs")
             .insert({
-              bot_id: provider.profile_id,
-              action_type: "bid_submitted",
-              details: { 
-                project_id: project.id, 
-                amount: bidAmount,
-                bypass_attempt: shouldBypass ? bypassType : null
-              }
+              bot_id: bot.profile_id,
+              action_type: "submit_bid",
+              details: { project_id: project.id, amount: bidAmount }
             });
 
           results.created++;
-        } catch (err) {
-          results.errors.push(`Error submitting bid: ${err.message}`);
+        } catch (err: any) {
+          results.errors.push(`Error: ${err.message}`);
         }
       }
     }
 
-    console.log(`Created ${results.created} bids (${results.bypassAttempts} with bypass attempts) with ${results.errors.length} errors`);
-
     return new Response(
-      JSON.stringify({
-        success: true,
-        created: results.created,
-        bypassAttempts: results.bypassAttempts,
-        errors: results.errors
-      }),
+      JSON.stringify({ success: true, created: results.created, errors: results.errors }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
-  } catch (error) {
-    console.error("Fatal error:", error);
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
