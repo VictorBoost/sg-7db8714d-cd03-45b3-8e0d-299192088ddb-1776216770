@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { sesEmailService } from "@/services/sesEmailService";
+// Keep SES import for future use when Amazon approves
+// import { sesEmailService } from "@/services/sesEmailService";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -39,12 +40,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log("Creating Supabase admin client...");
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create auth user
-    console.log("Creating auth user...");
+    // Create auth user with Supabase email confirmation
+    console.log("Creating auth user with email confirmation...");
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: false, // Let Supabase send confirmation email
       user_metadata: {
         full_name: `${firstName} ${lastName}`,
       }
@@ -123,47 +124,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Sign in to create session using regular client (not admin)
-    console.log("Creating session...");
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-    const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError || !signInData.session) {
-      console.error("❌ Session creation error:", signInError);
-      // User was created successfully, just couldn't auto-login
-      return res.status(200).json({ 
-        success: true,
-        message: "Registration successful! Please log in to continue.",
-        requiresManualLogin: true
-      });
-    }
-
-    console.log("✅ Session created");
-
-    // Set session cookie
-    res.setHeader(
-      "Set-Cookie",
-      `sb-access-token=${signInData.session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600`
-    );
-
-    // Send welcome email asynchronously (non-blocking)
-    console.log("Sending welcome email (async)...");
-    sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz").then(emailSent => {
-      console.log(emailSent ? "✅ Welcome email sent" : "⚠️ Welcome email failed");
-    }).catch(error => {
-      console.error("⚠️ Welcome email failed (non-critical):", error);
-    });
-
-    console.log("✅ Registration complete!");
+    console.log("✅ Registration complete! Supabase will send confirmation email.");
     console.log("=== REGISTRATION ENDPOINT COMPLETE ===\n");
 
+    // Return success without auto-login (user must verify email first)
     return res.status(200).json({
-      user: signInData.user,
-      session: signInData.session,
+      success: true,
+      message: "Registration successful! Please check your email to verify your account before logging in.",
+      requiresEmailVerification: true
     });
+
+    // SES welcome email disabled for now - will be enabled when Amazon SES is approved
+    // sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz");
+
   } catch (error: any) {
     console.error("❌ REGISTRATION ERROR:", error);
     console.error("Error details:", {

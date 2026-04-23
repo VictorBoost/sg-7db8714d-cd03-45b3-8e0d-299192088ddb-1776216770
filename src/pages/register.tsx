@@ -33,7 +33,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -54,58 +54,61 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    // Validation
-    if (!formData.firstName || !formData.lastName || !formData.email || 
-        !formData.phoneNumber || !formData.cityRegion || !formData.password) {
-      setError("All fields are required");
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
+    setSuccess("");
+    setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
-      return;
-    }
-
-    if (!formData.isClient && !formData.isProvider) {
-      setError("Please select at least one account type");
-      return;
-    }
-
-    setLoading(true);
-
-    const { error: signUpError } = await authService.signUp(
-      formData.email,
-      formData.password,
-      {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        phone_number: formData.phoneNumber,
-        city_region: formData.cityRegion,
-        is_client: formData.isClient,
-        is_provider: formData.isProvider,
-      }
-    );
-
-    if (signUpError) {
-      setError(signUpError.message || "Registration failed");
       setLoading(false);
       return;
     }
 
-    // Welcome email is sent by the API route - no need to call it here
-    setSuccess(true);
-    setLoading(false);
+    try {
+      const { user, session, error } = await authService.signUp(
+        formData.email,
+        formData.password,
+        {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone_number: formData.phoneNumber,
+          city_region: formData.cityRegion,
+          is_client: formData.isClient,
+          is_provider: formData.isProvider,
+        }
+      );
 
-    // Redirect to projects page after showing success message
-    setTimeout(() => {
+      if (error) {
+        setError(error.message || "Registration failed");
+        setLoading(false);
+        return;
+      }
+
+      // Check if email verification is required
+      if (!user && !session) {
+        setSuccess("Registration successful! Please check your email to verify your account before logging in.");
+        setLoading(false);
+        // Clear form
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          phoneNumber: "",
+          cityRegion: "",
+          password: "",
+          confirmPassword: "",
+          isClient: false,
+          isProvider: false,
+        });
+        return;
+      }
+
+      setSuccess("Registration successful!");
       router.push("/projects");
-    }, 3000);
+    } catch (err: any) {
+      setError(err.message || "An error occurred during registration");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSignIn = async () => {
