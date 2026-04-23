@@ -1,151 +1,118 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createClient } from "@supabase/supabase-js";
-// Keep SES import for future use when Amazon approves
-// import { sesEmailService } from "@/services/sesEmailService";
+import { supabase } from "@/integrations/supabase/client";
+import { createServerSupabaseClient } from "@supabase/auth-helpers-nextjs";
+import { sesEmailService } from "@/services/sesEmailService";
+import { emailLogService } from "@/services/emailLogService";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("\n=== REGISTRATION ENDPOINT CALLED ===");
-  console.log("Method:", req.method);
-  
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { email, password, firstName, lastName, phoneNumber, cityRegion, isClient, isProvider } = req.body;
-  console.log("Registration attempt for:", email);
-  console.log("Fields received:", { firstName, lastName, phoneNumber, cityRegion, isClient, isProvider });
+  const { email, password, fullName, userType } = req.body;
 
-  if (!email || !password || !firstName || !lastName || !phoneNumber || !cityRegion) {
-    console.log("❌ Missing required fields");
-    return res.status(400).json({ error: "Missing required fields" });
+  if (!email || !password || !fullName || !userType) {
+    return res.status(400).json({ 
+      error: "Email, password, full name, and user type are required" 
+    });
   }
 
-  // Validate environment variables
-  console.log("Environment check:", {
-    supabaseUrl: !!supabaseUrl,
-    supabaseServiceKey: !!supabaseServiceKey,
-    supabaseAnonKey: !!supabaseAnonKey
-  });
+  if (password.length < 6) {
+    return res.status(400).json({ 
+      error: "Password must be at least 6 characters long" 
+    });
+  }
 
-  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-    console.error("❌ Missing Supabase environment variables");
-    return res.status(500).json({ error: "Server configuration error. Please contact support." });
+  if (!["client", "provider", "both"].includes(userType)) {
+    return res.status(400).json({ 
+      error: "Invalid user type. Must be 'client', 'provider', or 'both'" 
+    });
   }
 
   try {
-    console.log("Creating Supabase admin client...");
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // Create server-side Supabase client
+    const supabaseServer = createServerSupabaseClient({ req, res });
 
-    // Create auth user with Supabase email confirmation
-    console.log("Creating auth user with email confirmation...");
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Create user account
+    const { data: authData, error: authError } = await supabaseServer.auth.signUp({
       email,
       password,
-      email_confirm: false, // Let Supabase send confirmation email
-      user_metadata: {
-        full_name: `${firstName} ${lastName}`,
-      }
+      options: {
+        data: {
+          full_name: fullName,
+        },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"}/auth/verify`,
+      },
     });
 
     if (authError) {
-      console.error("❌ Auth creation error:", authError);
-      
-      if (authError.message.includes("already registered")) {
-        return res.status(400).json({ error: "This email is already registered" });
-      }
-      
+      console.error("Registration auth error:", authError);
       return res.status(400).json({ error: authError.message });
     }
 
     if (!authData.user) {
-      console.error("❌ User creation failed: no user returned");
-      return res.status(400).json({ error: "User creation failed" });
+      return res.status(400).json({ error: "Failed to create user account" });
     }
 
-    console.log("✅ Auth user created:", authData.user.id);
-
-    // Create or update profile (trigger might have created it already)
-    console.log("Creating/updating profile...");
-    
-    // First, try to get existing profile
-    const { data: existingProfile } = await supabaseAdmin
+    // Update profile with user type
+    const { error: profileError } = await supabase
       .from("profiles")
-      .select("id")
-      .eq("id", authData.user.id)
-      .single();
+      .update({
+        full_name: fullName,
+        user_type: userType,
+      })
+      .eq("id", authData.user.id);
 
-    if (existingProfile) {
-      // Update existing profile
-      const { error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .update({
-          full_name: `${firstName} ${lastName}`,
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: phoneNumber,
-          city_region: cityRegion,
-          is_client: isClient || false,
-          is_provider: isProvider || false,
-        })
-        .eq("id", authData.user.id);
-
-      if (profileError) {
-        console.error("⚠️ Profile update error:", profileError);
-      } else {
-        console.log("✅ Profile updated");
-      }
-    } else {
-      // Create new profile
-      const { error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .insert({
-          id: authData.user.id,
-          email: email,
-          full_name: `${firstName} ${lastName}`,
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: phoneNumber,
-          city_region: cityRegion,
-          is_client: isClient || false,
-          is_provider: isProvider || false,
-        });
-
-      if (profileError) {
-        console.error("❌ Profile creation error:", profileError);
-        // Delete the auth user since profile creation failed
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        return res.status(500).json({ error: "Failed to create profile. Please try again." });
-      } else {
-        console.log("✅ Profile created");
-      }
+    if (profileError) {
+      console.error("Profile update error:", profileError);
+      // Don't fail registration if profile update fails
     }
 
-    console.log("✅ Registration complete! Supabase will send confirmation email.");
-    console.log("=== REGISTRATION ENDPOINT COMPLETE ===\n");
+    // Send welcome email
+    const emailSent = await sesEmailService.sendWelcomeEmail(
+      email,
+      fullName,
+      process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"
+    );
 
-    // Return success without auto-login (user must verify email first)
-    return res.status(200).json({
-      success: true,
-      message: "Registration successful! Please check your email to verify your account before logging in.",
-      requiresEmailVerification: true
+    // Log email attempt
+    if (emailSent) {
+      await emailLogService.logEmail({
+        recipient_email: email,
+        email_type: "welcome",
+        status: "sent",
+        metadata: { user_id: authData.user.id }
+      });
+    } else {
+      await emailLogService.logEmail({
+        recipient_email: email,
+        email_type: "welcome",
+        status: "failed",
+        error_message: "SES email service unavailable",
+        metadata: { user_id: authData.user.id }
+      });
+    }
+
+    // Set httpOnly cookie with session
+    if (authData.session) {
+      res.setHeader(
+        "Set-Cookie",
+        `sb-access-token=${authData.session.access_token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600`
+      );
+    }
+
+    res.status(201).json({
+      user: authData.user,
+      session: authData.session,
+      message: "Registration successful! Check your email for verification.",
     });
-
-    // SES welcome email disabled for now - will be enabled when Amazon SES is approved
-    // sesEmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`, "https://bluetika.co.nz");
-
   } catch (error: any) {
-    console.error("❌ REGISTRATION ERROR:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      code: error?.code,
-      stack: error?.stack
-    });
-    return res.status(500).json({ 
-      error: error?.message || "Connection error. Please try again." 
+    console.error("Registration error:", error);
+    res.status(500).json({ 
+      error: "Registration failed. Please try again or contact support." 
     });
   }
 }

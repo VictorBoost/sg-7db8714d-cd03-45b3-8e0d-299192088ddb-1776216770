@@ -1,112 +1,246 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Database } from "@/integrations/supabase/types";
+import { sesEmailService } from "@/services/sesEmailService";
+import { emailLogService } from "@/services/emailLogService";
 
-export type Dispute = Tables<"disputes">;
-
-interface CreateDisputeParams {
-  contractId: string;
-  raisedBy: string;
-  raiserRole: "client" | "provider";
-  claimDescription: string;
-}
-
-interface ResolveDisputeParams {
-  disputeId: string;
-  resolutionType: "release_to_provider" | "refund_to_client" | "partial_split";
-  resolutionReason: string;
-  resolvedBy: string;
-  clientRefundAmount?: number;
-  providerPayoutAmount?: number;
-}
+type Dispute = Database["public"]["Tables"]["disputes"]["Row"];
 
 export const disputeService = {
-  async createDispute(params: CreateDisputeParams): Promise<Dispute> {
+  async raiseDispute(contractId: string, raisedBy: string, raiserRole: "client" | "provider", reason: string, description: string) {
+    console.log("raiseDispute:", { contractId, raisedBy, raiserRole, reason });
+
+    // Get contract details for notifications
+    const { data: contract } = await supabase
+      .from("contracts")
+      .select(`
+        *,
+        project:projects(title),
+        client:profiles!contracts_client_id_fkey(email, full_name),
+        provider:profiles!contracts_provider_id_fkey(email, full_name)
+      `)
+      .eq("id", contractId)
+      .single();
+
     const { data, error } = await supabase
       .from("disputes")
       .insert({
-        contract_id: params.contractId,
-        raised_by: params.raisedBy,
-        raiser_role: params.raiserRole,
-        claim_description: params.claimDescription,
+        contract_id: contractId,
+        raised_by: raisedBy,
+        raiser_role: raiserRole,
+        reason,
+        description,
+        status: "open",
       })
       .select()
       .single();
 
-    if (error) throw error;
-
-    // Update contract status to dispute
-    await supabase
-      .from("contracts")
-      .update({ status: "dispute" })
-      .eq("id", params.contractId);
-
-    return data;
-  },
-
-  async getDisputeByContract(contractId: string): Promise<Dispute | null> {
-    const { data, error } = await supabase
-      .from("disputes")
-      .select("*")
-      .eq("contract_id", contractId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async resolveDispute(params: ResolveDisputeParams): Promise<void> {
-    const { data: dispute, error: fetchError } = await supabase
-      .from("disputes")
-      .select("*, contracts(*)")
-      .eq("id", params.disputeId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    const updates: any = {
-      resolution_type: params.resolutionType,
-      resolution_reason: params.resolutionReason,
-      resolved_by: params.resolvedBy,
-      resolved_at: new Date().toISOString(),
-    };
-
-    if (params.resolutionType === "partial_split") {
-      updates.client_refund_amount = params.clientRefundAmount;
-      updates.provider_payout_amount = params.providerPayoutAmount;
+    console.log("raiseDispute result:", { data, error });
+    if (error) {
+      console.error("Failed to raise dispute:", error);
+      return { data: null, error };
     }
-
-    const { error: updateError } = await supabase
-      .from("disputes")
-      .update(updates)
-      .eq("id", params.disputeId);
-
-    if (updateError) throw updateError;
 
     // Update contract status
     await supabase
       .from("contracts")
-      .update({ status: "funds_released" })
-      .eq("id", dispute.contract_id);
+      .update({ status: "disputed" })
+      .eq("id", contractId);
+
+    // Send email to admin
+    if (contract?.project) {
+      const adminEmailSent = await sesEmailService.sendAdminDisputeNotification(
+        contractId,
+        contract.project.title,
+        raiserRole === "client" ? contract.client?.full_name || "Client" : contract.provider?.full_name || "Provider",
+        raiserRole,
+        process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"
+      );
+
+      await emailLogService.logEmail({
+        recipient_email: "admin@bluetika.co.nz",
+        email_type: "dispute_raised_admin",
+        status: adminEmailSent ? "sent" : "failed",
+        metadata: { dispute_id: data.id, contract_id: contractId }
+      });
+
+      // Send email to OTHER party (not the one who raised it)
+      const otherParty = raiserRole === "client" ? contract.provider : contract.client;
+      if (otherParty) {
+        const otherPartyEmailSent = await sesEmailService.sendEmail({
+          to: otherParty.email,
+          subject: "BlueTika: Dispute Raised on Your Contract",
+          htmlBody: `
+            <h2>Dispute Notification</h2>
+            <p>Kia ora ${otherParty.full_name || "User"},</p>
+            <p>A dispute has been raised for <strong>${contract.project.title}</strong>.</p>
+            <p><strong>Reason:</strong> ${reason}</p>
+            <p><strong>Description:</strong> ${description}</p>
+            <p>Our team will review this dispute and work towards a fair resolution. You'll be contacted shortly.</p>
+            <p><a href="${process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"}/contracts">View Contract</a></p>
+          `
+        });
+
+        await emailLogService.logEmail({
+          recipient_email: otherParty.email,
+          email_type: "dispute_raised_notification",
+          status: otherPartyEmailSent ? "sent" : "failed",
+          metadata: { dispute_id: data.id, contract_id: contractId }
+        });
+      }
+
+      // Send confirmation email to the person who raised it
+      const raiser = raiserRole === "client" ? contract.client : contract.provider;
+      if (raiser) {
+        const raiserEmailSent = await sesEmailService.sendEmail({
+          to: raiser.email,
+          subject: "BlueTika: Your Dispute Has Been Submitted",
+          htmlBody: `
+            <h2>Dispute Submitted</h2>
+            <p>Kia ora ${raiser.full_name || "User"},</p>
+            <p>Your dispute for <strong>${contract.project.title}</strong> has been submitted successfully.</p>
+            <p><strong>Reason:</strong> ${reason}</p>
+            <p>Our team will review this dispute and contact you within 24-48 hours. We're committed to fair resolution.</p>
+            <p><a href="${process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"}/contracts">View Contract</a></p>
+          `
+        });
+
+        await emailLogService.logEmail({
+          recipient_email: raiser.email,
+          email_type: "dispute_raised_confirmation",
+          status: raiserEmailSent ? "sent" : "failed",
+          metadata: { dispute_id: data.id, contract_id: contractId }
+        });
+      }
+    }
+
+    return { data, error: null };
   },
 
-  async getPendingDisputes(): Promise<any[]> {
+  async getDisputesByContract(contractId: string) {
+    const { data, error } = await supabase
+      .from("disputes")
+      .select("*")
+      .eq("contract_id", contractId)
+      .order("created_at", { ascending: false });
+
+    console.log("getDisputesByContract:", { data, error });
+    if (error) console.error("Failed to fetch disputes:", error);
+
+    return { data: data || [], error };
+  },
+
+  async getAllDisputes() {
     const { data, error } = await supabase
       .from("disputes")
       .select(`
         *,
-        contracts(
-          *,
-          projects(title, category_id),
-          bids(agreed_price),
-          client:client_id(full_name, email),
-          provider:provider_id(full_name, email)
-        ),
-        raised_by_profile:raised_by(full_name, email)
+        contract:contracts(
+          project:projects(title),
+          client:profiles!contracts_client_id_fkey(full_name, email),
+          provider:profiles!contracts_provider_id_fkey(full_name, email)
+        )
       `)
-      .is("resolved_at", null)
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    console.log("getAllDisputes:", { data, error });
+    if (error) console.error("Failed to fetch all disputes:", error);
+
+    return { data: data || [], error };
+  },
+
+  async resolveDispute(
+    disputeId: string,
+    resolutionType: "refund_client" | "pay_provider" | "split_payment" | "custom",
+    resolutionReason: string,
+    refundAmount?: number,
+    payoutAmount?: number
+  ) {
+    console.log("resolveDispute:", { disputeId, resolutionType, resolutionReason });
+
+    // Get dispute with contract details
+    const { data: dispute } = await supabase
+      .from("disputes")
+      .select(`
+        *,
+        contract:contracts(
+          *,
+          project:projects(title),
+          client:profiles!contracts_client_id_fkey(email, full_name),
+          provider:profiles!contracts_provider_id_fkey(email, full_name)
+        )
+      `)
+      .eq("id", disputeId)
+      .single();
+
+    const { data, error } = await supabase
+      .from("disputes")
+      .update({
+        status: "resolved",
+        resolution_type: resolutionType,
+        resolution_reason: resolutionReason,
+        refund_amount: refundAmount,
+        payout_amount: payoutAmount,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", disputeId)
+      .select()
+      .single();
+
+    console.log("resolveDispute result:", { data, error });
+    if (error) {
+      console.error("Failed to resolve dispute:", error);
+      return { data: null, error };
+    }
+
+    // Update contract status
+    if (dispute?.contract_id) {
+      await supabase
+        .from("contracts")
+        .update({ status: "completed" })
+        .eq("id", dispute.contract_id);
+    }
+
+    // Send resolution emails to BOTH parties
+    if (dispute?.contract?.client) {
+      const clientEmailSent = await sesEmailService.sendDisputeResolutionNotification(
+        dispute.contract.client.email,
+        dispute.contract.client.full_name || "Client",
+        "client",
+        dispute.contract.project?.title || "Project",
+        resolutionType,
+        resolutionReason,
+        refundAmount,
+        process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"
+      );
+
+      await emailLogService.logEmail({
+        recipient_email: dispute.contract.client.email,
+        email_type: "dispute_resolved_client",
+        status: clientEmailSent ? "sent" : "failed",
+        metadata: { dispute_id: disputeId, resolution_type: resolutionType }
+      });
+    }
+
+    if (dispute?.contract?.provider) {
+      const providerEmailSent = await sesEmailService.sendDisputeResolutionNotification(
+        dispute.contract.provider.email,
+        dispute.contract.provider.full_name || "Provider",
+        "provider",
+        dispute.contract.project?.title || "Project",
+        resolutionType,
+        resolutionReason,
+        payoutAmount,
+        process.env.NEXT_PUBLIC_BASE_URL || "https://bluetika.co.nz"
+      );
+
+      await emailLogService.logEmail({
+        recipient_email: dispute.contract.provider.email,
+        email_type: "dispute_resolved_provider",
+        status: providerEmailSent ? "sent" : "failed",
+        metadata: { dispute_id: disputeId, resolution_type: resolutionType }
+      });
+    }
+
+    return { data, error: null };
   },
 };

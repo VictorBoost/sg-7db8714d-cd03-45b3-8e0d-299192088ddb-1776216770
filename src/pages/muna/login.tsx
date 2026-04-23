@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Shield } from "lucide-react";
 
-export default function AdminLogin() {
+export default function MunaLogin() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -17,57 +17,32 @@ export default function AdminLogin() {
     password: ""
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // First, authenticate with regular login
-      const loginRes = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/muna-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        }),
-        credentials: "include"
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
       });
 
-      if (!loginRes.ok) {
-        const error = await loginRes.json();
-        throw new Error(error.error || "Login failed");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
       }
 
-      // Then verify admin status
-      const adminRes = await fetch("/api/auth/verify-admin", {
-        credentials: "include"
-      });
-
-      if (!adminRes.ok) {
-        // Not an admin - log them out and show error
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          credentials: "include"
-        });
-        throw new Error("Access denied. Admin privileges required.");
-      }
-
-      const adminData = await adminRes.json();
-
-      if (!adminData.isAdmin) {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          credentials: "include"
-        });
+      if (!data.isAdmin) {
         throw new Error("Access denied. Admin privileges required.");
       }
 
       toast({
         title: "Access granted",
-        description: `Welcome, ${adminData.role}`,
+        description: `Welcome, ${data.role}`,
       });
 
-      // Redirect to admin dashboard
       router.push("/muna");
     } catch (error) {
       toast({
@@ -108,7 +83,7 @@ export default function AdminLogin() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input

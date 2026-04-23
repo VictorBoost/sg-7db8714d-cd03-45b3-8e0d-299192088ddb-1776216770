@@ -1,8 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { supabase } from "@/integrations/supabase/client";
+import { createServerSupabaseClient } from "@supabase/auth-helpers-nextjs";
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,57 +13,40 @@ export default async function handler(
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: "Email and password required" });
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Create server-side Supabase client with cookie handling
+    const supabaseServer = createServerSupabaseClient({ req, res });
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // Sign in with email and password
+    const { data, error } = await supabaseServer.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      console.error("Login error details:", {
-        message: error.message,
-        status: error.status,
-        name: error.name,
-        email: email
-      });
-      
-      if (error.message.includes("Invalid login credentials")) {
-        return res.status(401).json({ error: "Incorrect email or password" });
-      }
-      
-      if (error.message.includes("Email not confirmed")) {
-        return res.status(401).json({ error: "Please verify your email address" });
-      }
-      
+      console.error("Login error:", error);
       return res.status(401).json({ error: error.message });
     }
 
-    if (!data.session || !data.user) {
-      console.error("Login failed: No session or user returned", { email });
-      return res.status(401).json({ error: "Failed to create session" });
+    if (!data.user) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Set HTTP-only cookie with session token
+    // Set httpOnly cookie with session
     res.setHeader(
       "Set-Cookie",
-      `sb-access-token=${data.session.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600`
+      `sb-access-token=${data.session?.access_token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600`
     );
 
-    console.log("Login successful:", { email, userId: data.user.id });
-
-    return res.status(200).json({
+    res.status(200).json({
       user: data.user,
       session: data.session,
     });
   } catch (error: any) {
     console.error("Login error:", error);
-    return res.status(500).json({ 
-      error: error?.message || "Connection error. Please try again." 
-    });
+    res.status(500).json({ error: "Authentication failed. Please try again." });
   }
 }
