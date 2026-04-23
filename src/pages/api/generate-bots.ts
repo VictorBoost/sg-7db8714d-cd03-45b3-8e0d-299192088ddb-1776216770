@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const clientCount = Math.floor(count * 0.8);
     const providerCount = count - clientCount;
 
-    console.log(`Generating ${count} bots: ${clientCount} clients, ${providerCount} providers`);
+    console.log(`Generating ${count} bots: ${clientCount} clients (80%), ${providerCount} providers (20%)`);
 
     // Generate provider bots (20%)
     for (let i = 0; i < providerCount; i++) {
@@ -69,24 +69,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
 
-        const { error: profileError } = await supabaseAdmin.from("profiles").update({
-          first_name: firstName,
-          last_name: lastName,
-          full_name: `${firstName} ${lastName}`,
-          city_region: city,
-          location: city,
-          phone_number: `021 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`,
-          is_client: true,
-          is_provider: true,
-          verification_status: "approved",
-          bio: `Experienced ${city} service provider. Quality workmanship guaranteed.`
-        }).eq("id", authData.user.id);
+        // Wait a bit for auto-creation trigger
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-        if (profileError) {
-          results.failed++;
-          results.errors.push(`Provider ${i} profile: ${profileError.message}`);
-          console.error(`Provider ${i} profile error:`, profileError);
-          continue;
+        // Check if profile exists, if not create it
+        const { data: existingProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("id", authData.user.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          // Profile doesn't exist, insert it
+          const { error: profileInsertError } = await supabaseAdmin.from("profiles").insert({
+            id: authData.user.id,
+            email,
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+            city_region: city,
+            location: city,
+            phone_number: `021 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`,
+            is_client: true,
+            is_provider: true,
+            verification_status: "approved",
+            bio: `Experienced ${city} service provider. Quality workmanship guaranteed.`
+          });
+
+          if (profileInsertError) {
+            results.failed++;
+            results.errors.push(`Provider ${i} profile insert: ${profileInsertError.message}`);
+            console.error(`Provider ${i} profile insert error:`, profileInsertError);
+            continue;
+          }
+        } else {
+          // Profile exists, update it
+          const { error: profileError } = await supabaseAdmin.from("profiles").update({
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+            city_region: city,
+            location: city,
+            phone_number: `021 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`,
+            is_client: true,
+            is_provider: true,
+            verification_status: "approved",
+            bio: `Experienced ${city} service provider. Quality workmanship guaranteed.`
+          }).eq("id", authData.user.id);
+
+          if (profileError) {
+            results.failed++;
+            results.errors.push(`Provider ${i} profile update: ${profileError.message}`);
+            console.error(`Provider ${i} profile update error:`, profileError);
+            continue;
+          }
         }
 
         const { error: botError } = await supabaseAdmin.from("bot_accounts").insert({
@@ -140,23 +176,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
 
-        const { error: profileError } = await supabaseAdmin.from("profiles").update({
-          first_name: firstName,
-          last_name: lastName,
-          full_name: `${firstName} ${lastName}`,
-          city_region: city,
-          location: city,
-          phone_number: `021 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`,
-          is_client: true,
-          is_provider: false,
-          bio: `Homeowner looking for reliable service providers in ${city}.`
-        }).eq("id", authData.user.id);
+        // Wait a bit for auto-creation trigger
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-        if (profileError) {
-          results.failed++;
-          results.errors.push(`Client ${i} profile: ${profileError.message}`);
-          console.error(`Client ${i} profile error:`, profileError);
-          continue;
+        // Check if profile exists, if not create it
+        const { data: existingProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("id", authData.user.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          // Profile doesn't exist, insert it
+          const { error: profileInsertError } = await supabaseAdmin.from("profiles").insert({
+            id: authData.user.id,
+            email,
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+            city_region: city,
+            location: city,
+            phone_number: `021 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`,
+            is_client: true,
+            is_provider: false,
+            bio: `Homeowner looking for reliable service providers in ${city}.`
+          });
+
+          if (profileInsertError) {
+            results.failed++;
+            results.errors.push(`Client ${i} profile insert: ${profileInsertError.message}`);
+            console.error(`Client ${i} profile insert error:`, profileInsertError);
+            continue;
+          }
+        } else {
+          // Profile exists, update it
+          const { error: profileError } = await supabaseAdmin.from("profiles").update({
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+            city_region: city,
+            location: city,
+            phone_number: `021 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`,
+            is_client: true,
+            is_provider: false,
+            bio: `Homeowner looking for reliable service providers in ${city}.`
+          }).eq("id", authData.user.id);
+
+          if (profileError) {
+            results.failed++;
+            results.errors.push(`Client ${i} profile update: ${profileError.message}`);
+            console.error(`Client ${i} profile update error:`, profileError);
+            continue;
+          }
         }
 
         const { error: botError } = await supabaseAdmin.from("bot_accounts").insert({
