@@ -69,7 +69,7 @@ serve(async (req) => {
         contract:contracts(
           id,
           status,
-          project:projects(title, client_id),
+          project:projects(id, title, client_id),
           client_id,
           provider_id
         )

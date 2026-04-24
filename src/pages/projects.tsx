@@ -31,7 +31,7 @@ export default function Projects() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress" | "completed">("open");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [subcategoryFilter, setSubcategoryFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
@@ -69,15 +69,20 @@ export default function Projects() {
 
   const loadProjects = async () => {
     setLoading(true);
-    const { data, error } = await projectService.getAllProjects(
-      statusFilter === "all" ? undefined : statusFilter
-    );
+    const { data, error } = await projectService.getAllProjects();
     
     if (!error && data) {
-      const projectsWithBidCount = data.map((project: any) => ({
+      // Filter to only show active projects (open, in_progress)
+      // Exclude: draft, expired, archived, completed, cancelled
+      const activeProjects = data.filter((p: any) => 
+        p.status === "open" || p.status === "in_progress"
+      );
+
+      const projectsWithBidCount = activeProjects.map((project: any) => ({
         ...project,
         bid_count: project.bids ? project.bids.length : 0
       }));
+      
       setProjects(projectsWithBidCount);
     }
     setLoading(false);
@@ -88,6 +93,7 @@ export default function Projects() {
       p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.location.toLowerCase().includes(searchTerm.toLowerCase());
     
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
     const matchesCategory = categoryFilter === "all" || p.category_id === categoryFilter;
     const matchesSubcategory = subcategoryFilter === "all" || p.subcategory_id === subcategoryFilter;
     const matchesLocation = locationFilter === "all" || p.location === locationFilter;
@@ -101,7 +107,7 @@ export default function Projects() {
       matchesDate = p.date_preference === dateFilter;
     }
     
-    return matchesSearch && matchesCategory && matchesSubcategory && 
+    return matchesSearch && matchesStatus && matchesCategory && matchesSubcategory && 
            matchesLocation && matchesBudget && matchesDate;
   });
 
@@ -244,10 +250,9 @@ export default function Projects() {
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Projects</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="all">All Active</SelectItem>
+                      <SelectItem value="open">Open for Bids</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
