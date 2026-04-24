@@ -613,7 +613,9 @@ export default function PostProject() {
                 <Alert className="mb-6">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    A 2% platform fee will be added to the agreed price at checkout. All amounts in NZD. No GST currently applies.
+                    <strong>Important:</strong> A 2% platform fee will be added to the agreed price at checkout. All amounts in NZD. No GST currently applies.
+                    <br /><br />
+                    <strong>Project Lifecycle:</strong> Unassigned projects expire 7 days after the deadline. Drafts remain in your account indefinitely until published or deleted.
                   </AlertDescription>
                 </Alert>
 

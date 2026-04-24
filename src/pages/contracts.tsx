@@ -4,11 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { contractService } from "@/services/contractService";
 import { googleCalendarService } from "@/services/googleCalendarService";
 import { routineContractService } from "@/services/routineContractService";
+import { cancellationService } from "@/services/cancellationService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Loader2, Clock, MapPin, Star, Calendar as CalendarIcon } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Calendar, Loader2, Clock, MapPin, Star, Calendar as CalendarIcon, AlertCircle, XCircle } from "lucide-react";
 import { ProgressSteps } from "@/components/ProgressSteps";
 import { EvidencePhotoUpload } from "@/components/EvidencePhotoUpload";
 import { ReviewSubmissionModal } from "@/components/ReviewSubmissionModal";
@@ -32,6 +36,10 @@ export default function ContractsPage() {
   const [routinePromptContract, setRoutinePromptContract] = useState<any>(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [syncingCalendar, setSyncingCalendar] = useState<string | null>(null);
+  const [cancellationRequests, setCancellationRequests] = useState<Record<string, any>>({});
+  const [showCancellationForm, setShowCancellationForm] = useState<string | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [submittingCancellation, setSubmittingCancellation] = useState(false);
 
   useEffect(() => {
     checkUserAndLoadData();
@@ -53,6 +61,7 @@ export default function ContractsPage() {
     
     await loadContracts(user.id);
     await loadRoutineContracts(user.id);
+    await loadCancellationRequests(user.id);
   }
 
   async function loadContracts(userId: string) {
@@ -81,6 +90,102 @@ export default function ContractsPage() {
     
     const allRoutines = [...(clientRoutines || []), ...(providerRoutines || [])];
     setRoutineContracts(allRoutines);
+  }
+
+  async function loadCancellationRequests(userId: string) {
+    const { data } = await cancellationService.getUserCancellationRequests(userId);
+    
+    if (data) {
+      const requestsMap: Record<string, any> = {};
+      data.forEach((req: any) => {
+        requestsMap[req.contract_id] = req;
+      });
+      setCancellationRequests(requestsMap);
+    }
+  }
+
+  async function handleRequestCancellation(contractId: string) {
+    if (!cancellationReason.trim()) {
+      toast({
+        title: "Reason Required",
+        description: "Please provide a reason for cancellation",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSubmittingCancellation(true);
+
+    try {
+      const contract = contracts.find(c => c.id === contractId);
+      const isClient = contract.client_id === user?.id;
+      
+      const { data, error } = await cancellationService.createCancellationRequest(
+        contractId,
+        user!.id,
+        isClient ? "client" : "provider",
+        cancellationReason
+      );
+
+      if (error) {
+        toast({
+          title: "Request Failed",
+          description: "Could not submit cancellation request",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Request Submitted",
+          description: "The other party has 48 hours to respond before auto-cancellation"
+        });
+        setShowCancellationForm(null);
+        setCancellationReason("");
+        await loadCancellationRequests(user!.id);
+      }
+    } catch (error) {
+      console.error("Error requesting cancellation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit cancellation request",
+        variant: "destructive"
+      });
+    } finally {
+      setSubmittingCancellation(false);
+    }
+  }
+
+  async function handleRespondToCancellation(requestId: string, status: "approved" | "rejected") {
+    const { error } = await cancellationService.respondToCancellationRequest(
+      requestId,
+      status,
+      status === "rejected" ? "Cancellation rejected by other party" : undefined
+    );
+
+    if (error) {
+      toast({
+        title: "Response Failed",
+        description: "Could not respond to cancellation request",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (status === "approved") {
+      toast({
+        title: "Cancellation Approved",
+        description: "The contract has been cancelled"
+      });
+    } else {
+      toast({
+        title: "Cancellation Rejected",
+        description: "The cancellation request has been rejected"
+      });
+    }
+
+    if (user) {
+      await loadContracts(user.id);
+      await loadCancellationRequests(user.id);
+    }
   }
 
   function handleOpenReviewModal(contract: any) {
@@ -195,6 +300,13 @@ export default function ContractsPage() {
           <p className="text-muted-foreground">Track your ongoing projects and agreements</p>
         </div>
 
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Contract Lifecycle:</strong> Cancellation requests give the other party 48 hours to respond before auto-cancellation. Completed/cancelled contracts move to archive and are not deleted.
+          </AlertDescription>
+        </Alert>
+
         {!calendarConnected && (
           <Card className="mb-6 border-accent">
             <CardHeader>
@@ -218,7 +330,7 @@ export default function ContractsPage() {
           <TabsList>
             <TabsTrigger value="active">Active Contracts</TabsTrigger>
             <TabsTrigger value="routine">Routine Arrangements ({routineContracts.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsTrigger value="completed">Archive</TabsTrigger>
           </TabsList>
 
           <TabsContent value="active" className="space-y-4">
@@ -226,7 +338,7 @@ export default function ContractsPage() {
               <div className="flex justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin" />
               </div>
-            ) : contracts.filter(c => c.status !== "Completed" && c.status !== "Awaiting Fund Release").length === 0 ? (
+            ) : contracts.filter(c => c.status !== "Completed" && c.status !== "Awaiting Fund Release" && c.status !== "cancelled").length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
                   No active contracts found
@@ -234,10 +346,13 @@ export default function ContractsPage() {
               </Card>
             ) : (
               contracts
-                .filter(c => c.status !== "Completed" && c.status !== "Awaiting Fund Release")
+                .filter(c => c.status !== "Completed" && c.status !== "Awaiting Fund Release" && c.status !== "cancelled")
                 .map((contract) => {
                   const isClient = contract.client_id === user?.id;
                   const otherParty = isClient ? contract.provider : contract.client;
+                  const cancellationRequest = cancellationRequests[contract.id];
+                  const isPendingCancellation = cancellationRequest?.status === "pending";
+                  const isRequester = cancellationRequest?.requester_id === user?.id;
                   
                   return (
                     <Card key={contract.id}>
@@ -253,6 +368,47 @@ export default function ContractsPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
+                        {isPendingCancellation && (
+                          <Alert variant="destructive">
+                            <XCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              {isRequester ? (
+                                <>
+                                  <strong>Cancellation Requested</strong>
+                                  <br />
+                                  Waiting for {isClient ? "provider" : "client"} response. Auto-cancellation in 48 hours.
+                                  <br />
+                                  <span className="text-xs">Deadline: {new Date(cancellationRequest.auto_approval_deadline).toLocaleString("en-NZ")}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <strong>Cancellation Request Received</strong>
+                                  <br />
+                                  {isClient ? "Provider" : "Client"} has requested to cancel this contract.
+                                  <br />
+                                  <strong>Reason:</strong> {cancellationRequest.reason}
+                                  <div className="flex gap-2 mt-3">
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleRespondToCancellation(cancellationRequest.id, "approved")}
+                                    >
+                                      Approve Cancellation
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleRespondToCancellation(cancellationRequest.id, "rejected")}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
                         <ProgressSteps steps={[
                           { label: "Active", status: contract.status === "active" ? "active" : "completed" },
                           { label: "Work Done", status: contract.status === "Work Completed" ? "active" : (contract.status === "Evidence Uploaded" || contract.status === "Completed" || contract.status === "Awaiting Fund Release" ? "completed" : "upcoming") },
@@ -286,6 +442,52 @@ export default function ContractsPage() {
                             )}
                             Add to Calendar
                           </Button>
+                        )}
+
+                        {/* Cancellation Request Section */}
+                        {!isPendingCancellation && contract.status === "active" && (
+                          <div className="border-t pt-4">
+                            {showCancellationForm === contract.id ? (
+                              <div className="space-y-3">
+                                <Label>Reason for Cancellation</Label>
+                                <Textarea
+                                  placeholder="Please explain why you want to cancel this contract..."
+                                  value={cancellationReason}
+                                  onChange={(e) => setCancellationReason(e.target.value)}
+                                  rows={3}
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleRequestCancellation(contract.id)}
+                                    disabled={submittingCancellation}
+                                  >
+                                    {submittingCancellation ? "Submitting..." : "Submit Request"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setShowCancellationForm(null);
+                                      setCancellationReason("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setShowCancellationForm(contract.id)}
+                              >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Request Cancellation
+                              </Button>
+                            )}
+                          </div>
                         )}
 
                         {/* Evidence upload for provider when Work Completed */}
@@ -391,15 +593,15 @@ export default function ContractsPage() {
           </TabsContent>
 
           <TabsContent value="completed" className="space-y-4">
-            {contracts.filter(c => c.status === "Completed" || c.status === "Awaiting Fund Release").length === 0 ? (
+            {contracts.filter(c => c.status === "Completed" || c.status === "Awaiting Fund Release" || c.status === "cancelled").length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
-                  No completed contracts found
+                  No archived contracts found
                 </CardContent>
               </Card>
             ) : (
               contracts
-                .filter(c => c.status === "Completed" || c.status === "Awaiting Fund Release")
+                .filter(c => c.status === "Completed" || c.status === "Awaiting Fund Release" || c.status === "cancelled")
                 .map((contract) => {
                   const isClient = contract.client_id === user?.id;
                   const otherParty = isClient ? contract.provider : contract.client;
@@ -424,7 +626,7 @@ export default function ContractsPage() {
                             <p className="font-semibold">${contract.agreed_price?.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Completed</p>
+                            <p className="text-muted-foreground">{contract.status === "cancelled" ? "Cancelled" : "Completed"}</p>
                             <p className="font-semibold">
                               {new Date(contract.updated_at).toLocaleDateString("en-NZ")}
                             </p>
