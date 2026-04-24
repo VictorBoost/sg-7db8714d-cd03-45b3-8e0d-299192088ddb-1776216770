@@ -46,6 +46,10 @@ export const fundReleaseService = {
   },
 
   async getReadyForReleaseContracts(): Promise<any[]> {
+    // Filter: Current_Time > (ready_for_release_at + 24 hours)
+    // Which means: ready_for_release_at < (Current_Time - 24 hours)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
     const { data, error } = await supabase
       .from("contracts")
       .select(`
@@ -63,7 +67,7 @@ export const fundReleaseService = {
       `)
       .eq("status", "awaiting_fund_release")
       .not("ready_for_release_at", "is", null)
-      .lte("ready_for_release_at", new Date().toISOString())
+      .lte("ready_for_release_at", twentyFourHoursAgo)
       .order("ready_for_release_at", { ascending: true });
 
     if (error) throw error;
