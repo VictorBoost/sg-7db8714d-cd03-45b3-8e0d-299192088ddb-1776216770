@@ -317,92 +317,15 @@ serve(async (req) => {
 
         const data = await response.json();
         if (data.success) {
-          results.payments = data.paid || 0;
-          console.log(`✅ AUTO-BOT-ACTIVITY: Processed ${results.payments} payments`);
+          results.payments = data.completed || 0;
+          console.log(`✅ AUTO-BOT-ACTIVITY: Completed ${results.payments} work submissions`);
         }
       } else {
         console.log("⏸️ AUTO-BOT-ACTIVITY: Bot payments disabled, skipping");
       }
     } catch (err: any) {
-      console.error("❌ AUTO-BOT-ACTIVITY: Payment processing failed:", err);
-      results.errors.push(`Payments: ${err.message}`);
-    }
-
-    await randomDelay();
-
-    // Step 5: Auto-approve held payments (for bot clients)
-    console.log("\n✅ AUTO-BOT-ACTIVITY: Step 5 - Auto-approving held payments...");
-    let approvedCount = 0;
-    try {
-      // Find contracts with held payments where client is a bot
-      const { data: heldContracts } = await supabaseClient
-        .from("contracts")
-        .select(`
-          id,
-          client_id,
-          provider_id,
-          stripe_payment_intent_id,
-          project:projects(title)
-        `)
-        .eq("payment_status", "held")
-        .limit(10);
-
-      if (heldContracts && heldContracts.length > 0) {
-        console.log(`🎯 AUTO-BOT-ACTIVITY: Found ${heldContracts.length} held payments`);
-
-        for (const contract of heldContracts) {
-          await randomDelay();
-
-          // Check if client is a bot
-          const { data: clientBot } = await supabaseClient
-            .from("bot_accounts")
-            .select("profile_id")
-            .eq("profile_id", contract.client_id)
-            .maybeSingle();
-
-          if (clientBot && contract.stripe_payment_intent_id) {
-            try {
-              // Import Stripe for payment capture
-              const Stripe = (await import("https://esm.sh/stripe@14.21.0")).default;
-              const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-                apiVersion: "2025-02-24.acacia",
-              });
-
-              // Capture the payment
-              await stripe.paymentIntents.capture(contract.stripe_payment_intent_id);
-
-              // Update contract to released status
-              await supabaseClient
-                .from("contracts")
-                .update({
-                  payment_status: "released",
-                  payment_captured_at: new Date().toISOString(),
-                  escrow_released_method: "client_approval",
-                })
-                .eq("id", contract.id);
-
-              // Notify provider
-              await supabaseClient.from("notifications").insert({
-                user_id: contract.provider_id,
-                title: "Payment Released",
-                message: `Payment for "${contract.project?.title}" has been approved and released. Funds will arrive in 2-3 business days.`,
-                type: "payment",
-                related_contract_id: contract.id,
-              });
-
-              approvedCount++;
-              console.log(`✅ AUTO-BOT-ACTIVITY: Auto-approved payment for contract ${contract.id}`);
-            } catch (err: any) {
-              console.error(`❌ AUTO-BOT-ACTIVITY: Failed to approve contract ${contract.id}:`, err.message);
-              results.errors.push(`Approval ${contract.id}: ${err.message}`);
-            }
-          }
-        }
-      }
-      console.log(`✅ AUTO-BOT-ACTIVITY: Auto-approved ${approvedCount} payments`);
-    } catch (err: any) {
-      console.error("❌ AUTO-BOT-ACTIVITY: Auto-approval failed:", err);
-      results.errors.push(`Auto-approval: ${err.message}`);
+      console.error("❌ AUTO-BOT-ACTIVITY: Work completion failed:", err);
+      results.errors.push(`Work completion: ${err.message}`);
     }
 
     // Update last run timestamp
@@ -415,8 +338,7 @@ serve(async (req) => {
     console.log(`   Projects: ${results.projects}`);
     console.log(`   Bids: ${results.bids}`);
     console.log(`   Contracts: ${results.contracts}`);
-    console.log(`   Payments: ${results.payments}`);
-    console.log(`   Approvals: ${approvedCount}`);
+    console.log(`   Work Completed: ${results.payments}`);
     if (results.errors.length > 0) {
       console.log(`   Errors: ${results.errors.length}`);
     }
@@ -424,10 +346,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        results: {
-          ...results,
-          approvals: approvedCount
-        },
+        results,
         timestamp: now.toISOString()
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

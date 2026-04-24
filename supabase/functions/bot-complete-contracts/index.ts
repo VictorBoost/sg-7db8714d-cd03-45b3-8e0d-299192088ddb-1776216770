@@ -7,13 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TEST_CARDS = [
-  "4242424242424242",
-  "5555555555554444",
-  "378282246310005",
-  "6011111111111117",
-];
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -25,106 +18,157 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
-      apiVersion: "2023-10-16",
-    });
-
-    const { data: paymentSetting } = await supabaseClient
-      .from("platform_settings")
-      .select("setting_value")
-      .eq("setting_key", "bot_payments_enabled")
-      .single();
-
-    if (paymentSetting?.setting_value !== "true") {
-      return new Response(
-        JSON.stringify({ success: true, message: "Bot payments disabled", paid: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Find accepted contracts without evidence photos
     const { data: contracts } = await supabaseClient
       .from("contracts")
       .select(`
         id,
         client_id,
         provider_id,
-        bids!inner(agreed_price)
+        project_id,
+        bids!inner(agreed_price),
+        projects(title)
       `)
       .eq("status", "accepted")
-      .eq("payment_status", "pending")
-      .limit(20);
+      .is("work_done_at", null)
+      .limit(10);
 
     if (!contracts || contracts.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "No contracts need payment", paid: 0 }),
+        JSON.stringify({ success: true, message: "No contracts ready for completion", completed: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const results = { paid: 0, errors: [] as string[] };
+    const results = { completed: 0, errors: [] as string[] };
 
     for (const contract of contracts) {
       try {
+        // Only proceed if provider is a bot
+        const { data: providerBot } = await supabaseClient
+          .from("bot_accounts")
+          .select("profile_id")
+          .eq("profile_id", contract.provider_id)
+          .maybeSingle();
+
+        if (!providerBot) continue;
+
+        // Step 1: Upload mock "before" evidence photo
+        const beforePhotoUrl = `https://picsum.photos/seed/${contract.id}-before/800/600`;
+        await supabaseClient
+          .from("evidence_photos")
+          .insert({
+            contract_id: contract.id,
+            uploaded_by: contract.provider_id,
+            photo_type: "before",
+            photo_url: beforePhotoUrl,
+            caption: "Work area before starting the project",
+            is_confirmed: true
+          });
+
+        // Step 2: Upload mock "after" evidence photo
+        const afterPhotoUrl = `https://picsum.photos/seed/${contract.id}-after/800/600`;
+        await supabaseClient
+          .from("evidence_photos")
+          .insert({
+            contract_id: contract.id,
+            uploaded_by: contract.provider_id,
+            photo_type: "after",
+            photo_url: afterPhotoUrl,
+            caption: "Project completed as agreed. All work done to specification.",
+            is_confirmed: true
+          });
+
+        // Step 3: Mark work done - this triggers the 24-hour dispute window
+        const workDoneAt = new Date().toISOString();
+        const clientDisputeDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+        await supabaseClient
+          .from("contracts")
+          .update({
+            work_done_at: workDoneAt,
+            client_dispute_deadline: clientDisputeDeadline
+          })
+          .eq("id", contract.id);
+
+        // Step 4: Submit provider review (bots auto-review positively)
+        await supabaseClient
+          .from("reviews")
+          .insert({
+            contract_id: contract.id,
+            client_id: contract.client_id,
+            provider_id: contract.provider_id,
+            reviewer_role: "provider",
+            reviewee_role: "client",
+            rating: 5,
+            comment: "Great client to work with. Clear communication and prompt payment.",
+            is_public: true
+          });
+
+        // Step 5: Check if client is also a bot, submit their review too
         const { data: clientBot } = await supabaseClient
           .from("bot_accounts")
           .select("profile_id")
           .eq("profile_id", contract.client_id)
           .maybeSingle();
 
-        if (!clientBot) continue;
+        if (clientBot) {
+          await supabaseClient
+            .from("reviews")
+            .insert({
+              contract_id: contract.id,
+              client_id: contract.client_id,
+              provider_id: contract.provider_id,
+              reviewer_role: "client",
+              reviewee_role: "provider",
+              rating: 5,
+              comment: "Excellent service! Work completed exactly as promised.",
+              is_public: true
+            });
 
-        const amount = (contract.bids as any)?.agreed_price || 100;
-        const amountInCents = Math.round(amount * 100);
-        const testCard = TEST_CARDS[Math.floor(Math.random() * TEST_CARDS.length)];
+          // Set provider dispute deadline (5 working days from work_done)
+          const now = new Date(workDoneAt);
+          let daysAdded = 0;
+          const deadline = new Date(now);
 
-        const paymentMethod = await stripe.paymentMethods.create({
-          type: "card",
-          card: {
-            number: testCard,
-            exp_month: 12,
-            exp_year: 2025,
-            cvc: "123",
-          },
-        });
-
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: amountInCents,
-          currency: "nzd",
-          payment_method: paymentMethod.id,
-          confirm: true,
-          automatic_payment_methods: { enabled: false },
-          metadata: {
-            contract_id: contract.id,
-            is_bot_payment: "true"
+          while (daysAdded < 5) {
+            deadline.setDate(deadline.getDate() + 1);
+            const dayOfWeek = deadline.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+              daysAdded++;
+            }
           }
-        });
 
-        if (paymentIntent.status === "succeeded") {
           await supabaseClient
             .from("contracts")
             .update({
-              payment_status: "paid",
-              stripe_payment_intent_id: paymentIntent.id
+              provider_dispute_deadline: deadline.toISOString(),
+              ready_for_release_at: now.toISOString() // Will be eligible after 24h
             })
             .eq("id", contract.id);
-
-          await supabaseClient
-            .from("bot_activity_logs")
-            .insert({
-              bot_id: contract.client_id,
-              action_type: "complete_payment",
-              details: { contract_id: contract.id, amount }
-            });
-
-          results.paid++;
         }
+
+        // Log bot activity
+        await supabaseClient
+          .from("bot_activity_logs")
+          .insert({
+            bot_id: contract.provider_id,
+            action_type: "complete_work",
+            details: { 
+              contract_id: contract.id, 
+              work_done_at: workDoneAt,
+              client_dispute_deadline: clientDisputeDeadline
+            }
+          });
+
+        results.completed++;
       } catch (err: any) {
-        results.errors.push(`Payment failed: ${err.message}`);
+        results.errors.push(`Contract ${contract.id}: ${err.message}`);
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, paid: results.paid, errors: results.errors }),
+      JSON.stringify({ success: true, completed: results.completed, errors: results.errors }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
