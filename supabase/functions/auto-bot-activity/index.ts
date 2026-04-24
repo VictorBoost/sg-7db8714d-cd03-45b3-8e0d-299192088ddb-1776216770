@@ -19,7 +19,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Check if automation is enabled
     const { data: automationSetting } = await supabaseClient
       .from("platform_settings")
       .select("setting_value")
@@ -42,15 +41,13 @@ serve(async (req) => {
       errors: [] as string[]
     };
 
-    // Random delays between actions to look natural (1-3 seconds)
     const randomDelay = () => new Promise(resolve => 
       setTimeout(resolve, Math.floor(Math.random() * 2000) + 1000)
     );
 
-    // STEP 1: Post Projects (3-8 projects)
     console.log("\n📝 AUTO-BOT-ACTIVITY: Step 1 - Posting projects...");
     try {
-      const projectCount = Math.floor(Math.random() * 6) + 3; // 3-8 projects
+      const projectCount = Math.floor(Math.random() * 6) + 3;
       console.log(`🎯 AUTO-BOT-ACTIVITY: Will create ${projectCount} projects`);
 
       const { data: clientBots } = await supabaseClient
@@ -87,8 +84,7 @@ serve(async (req) => {
             .from("projects")
             .insert({
               title: template.title,
-              description: "Looking for someone reliable to help with this. " + 
-                          "Can provide more details if needed. Thanks!",
+              description: "Looking for someone reliable to help with this. Can provide more details if needed. Thanks!",
               category_id: category?.id,
               budget,
               urgency: template.urgency,
@@ -111,10 +107,9 @@ serve(async (req) => {
 
     await randomDelay();
 
-    // STEP 2: Submit Bids (5-15 bids)
     console.log("\n💰 AUTO-BOT-ACTIVITY: Step 2 - Submitting bids...");
     try {
-      const bidCount = Math.floor(Math.random() * 11) + 5; // 5-15 bids
+      const bidCount = Math.floor(Math.random() * 11) + 5;
       console.log(`🎯 AUTO-BOT-ACTIVITY: Will submit ${bidCount} bids`);
 
       const { data: openProjects } = await supabaseClient
@@ -137,7 +132,6 @@ serve(async (req) => {
           const project = openProjects[i];
           const provider = providerBots[Math.floor(Math.random() * providerBots.length)];
 
-          // Check if already bid
           const { data: existing } = await supabaseClient
             .from("bids")
             .select("id")
@@ -176,10 +170,9 @@ serve(async (req) => {
 
     await randomDelay();
 
-    // STEP 3: Accept Bids (1-3 contracts)
     console.log("\n📋 AUTO-BOT-ACTIVITY: Step 3 - Accepting bids...");
     try {
-      const acceptCount = Math.floor(Math.random() * 3) + 1; // 1-3 contracts
+      const acceptCount = Math.floor(Math.random() * 3) + 1;
       console.log(`🎯 AUTO-BOT-ACTIVITY: Will accept ${acceptCount} bids`);
 
       const { data: projectsWithBids } = await supabaseClient
@@ -197,7 +190,6 @@ serve(async (req) => {
         for (const project of projectsWithBids) {
           await randomDelay();
 
-          // Check if client is a bot
           const { data: clientBot } = await supabaseClient
             .from("bot_accounts")
             .select("profile_id")
@@ -209,13 +201,11 @@ serve(async (req) => {
             if (bids.length > 0) {
               const winningBid = bids[Math.floor(Math.random() * bids.length)];
 
-              // Accept winning bid
               await supabaseClient
                 .from("bids")
                 .update({ status: "accepted" })
                 .eq("id", winningBid.id);
 
-              // Decline others
               const otherBids = bids.filter(b => b.id !== winningBid.id);
               if (otherBids.length > 0) {
                 await supabaseClient
@@ -224,7 +214,6 @@ serve(async (req) => {
                   .in("id", otherBids.map(b => b.id));
               }
 
-              // Create contract
               const { error } = await supabaseClient
                 .from("contracts")
                 .insert({
@@ -237,7 +226,6 @@ serve(async (req) => {
                 });
 
               if (!error) {
-                // Update project status
                 await supabaseClient
                   .from("projects")
                   .update({ status: "in_progress" })
@@ -259,7 +247,6 @@ serve(async (req) => {
 
     await randomDelay();
 
-    // STEP 4: Process Payments (1-2 payments) - Only if enabled
     console.log("\n💳 AUTO-BOT-ACTIVITY: Step 4 - Processing payments...");
     try {
       const { data: paymentSetting } = await supabaseClient
@@ -269,11 +256,9 @@ serve(async (req) => {
         .single();
 
       if (paymentSetting?.setting_value === "true") {
-        const paymentCount = Math.floor(Math.random() * 2) + 1; // 1-2 payments
+        const paymentCount = Math.floor(Math.random() * 2) + 1;
         console.log(`🎯 AUTO-BOT-ACTIVITY: Will process ${paymentCount} payments`);
 
-        // Note: Actual Stripe payments are handled by bot-complete-contracts edge function
-        // We just trigger the completion flow here
         const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/bot-complete-contracts`, {
           method: "POST",
           headers: {
@@ -295,7 +280,11 @@ serve(async (req) => {
       results.errors.push(`Payments: ${err.message}`);
     }
 
-    // Log the activity cycle
+    await supabaseClient
+      .from("platform_settings")
+      .update({ setting_value: new Date().toISOString() })
+      .eq("setting_key", "bot_last_activity_run");
+
     console.log("\n📊 AUTO-BOT-ACTIVITY: Cycle complete");
     console.log(`   Projects: ${results.projects}`);
     console.log(`   Bids: ${results.bids}`);
