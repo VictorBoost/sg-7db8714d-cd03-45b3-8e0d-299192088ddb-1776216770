@@ -1,14 +1,13 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, DollarSign, Calendar, Clock, MessageSquare, Flag } from "lucide-react";
+import { MapPin, DollarSign, Calendar, Clock, Flag } from "lucide-react";
 import Link from "next/link";
 import type { Tables } from "@/integrations/supabase/types";
 import { useState } from "react";
 import { ReportModal } from "./ReportModal";
 
 type Project = Tables<"projects"> & {
-  bid_count?: number;
   category?: { name: string };
   subcategory?: { name: string };
 };
@@ -110,11 +109,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MessageSquare className="h-4 w-4" />
-              <span>{project.bid_count || 0} bids</span>
-            </div>
+          <div className="flex items-center justify-end pt-2 border-t">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>{getTimeAgo(project.created_at)}</span>

@@ -13,6 +13,7 @@ import { projectService } from "@/services/projectService";
 import { categoryService } from "@/services/categoryService";
 import { subcategoryService } from "@/services/subcategoryService";
 import type { Tables } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/supabase";
 
 type Project = Tables<"projects">;
 type Category = Tables<"categories">;
@@ -69,24 +70,26 @@ export default function Projects() {
 
   const loadProjects = async () => {
     setLoading(true);
-    const { data, error } = await projectService.getAllProjects();
+    // Don't fetch bids on public page - they're private
+    const { data, error } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        category:categories(name),
+        subcategory:subcategories(name)
+      `)
+      .order("created_at", { ascending: false });
     
     console.log("Projects loaded:", { count: data?.length, error });
     
     if (!error && data) {
       // Show all projects EXCEPT draft, cancelled, archived
-      // Include: open, in_progress, assigned, completed, expired
       const visibleProjects = data.filter((p: any) => 
         p.status !== "draft" && p.status !== "cancelled" && p.status !== "archived"
       );
-
-      const projectsWithBidCount = visibleProjects.map((project: any) => ({
-        ...project,
-        bid_count: Array.isArray(project.bids) ? project.bids.length : 0
-      }));
       
       console.log("Visible projects:", visibleProjects.length);
-      setProjects(projectsWithBidCount);
+      setProjects(visibleProjects);
     }
     setLoading(false);
   };

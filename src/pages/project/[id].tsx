@@ -131,14 +131,23 @@ export default function ProjectDetail() {
     } else {
       setProject(data);
       
-      // Ensure bids have project category_id for badge calculation
-      const bidsWithProject = (data?.bids || []).map((bid: any) => ({
-        ...bid,
-        projects: {
-          category_id: data?.category_id || null
-        }
-      }));
-      setBids(bidsWithProject);
+      // Only load bids if user is the project owner
+      const session = await authService.getCurrentSession();
+      const isOwner = session?.user?.id === data?.client_id;
+      
+      if (isOwner && data?.bids) {
+        // Ensure bids have project category_id for badge calculation
+        const bidsWithProject = (data.bids || []).map((bid: any) => ({
+          ...bid,
+          projects: {
+            category_id: data?.category_id || null
+          }
+        }));
+        setBids(bidsWithProject);
+      } else {
+        // Not the owner - hide all bids
+        setBids([]);
+      }
       
       // Check evidence photo status if project has an active contract
       const projectData = data as any;
@@ -808,32 +817,37 @@ export default function ProjectDetail() {
                   </CardContent>
                 </Card>
 
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Bids ({bids.length})</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {bids.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        No bids yet
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {bids.map((bid: any) => (
-                          <BidCard 
-                            key={bid.id} 
-                            bid={bid}
-                            isProjectOwner={isOwner}
-                            currentUserId={currentUser?.id}
-                            onAccept={handleAcceptBidClick}
-                            onViewProvider={handleViewProvider}
-                            accepting={accepting}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                {isOwner && (
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <CardTitle>Bids ({bids.length})</CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground">
+                        Only visible to you as the project owner
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {bids.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No bids yet
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          {bids.map((bid: any) => (
+                            <BidCard 
+                              key={bid.id} 
+                              bid={bid}
+                              isProjectOwner={isOwner}
+                              currentUserId={currentUser?.id}
+                              onAccept={handleAcceptBidClick}
+                              onViewProvider={handleViewProvider}
+                              accepting={accepting}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           </div>
