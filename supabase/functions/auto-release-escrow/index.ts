@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2025-02-24.acacia",
 });
 
 serve(async (req) => {
@@ -83,17 +83,19 @@ serve(async (req) => {
         // Create notification for provider
         await supabaseClient.from("notifications").insert({
           user_id: contract.provider_id,
-          type: "payment_released",
-          related_id: contract.id,
+          title: "Payment Released",
           message: `Payment for "${contract.project?.title}" has been auto-released. Funds will arrive in 2-3 business days.`,
+          type: "payment",
+          related_contract_id: contract.id,
         });
 
         // Create notification for client
         await supabaseClient.from("notifications").insert({
           user_id: contract.client_id,
-          type: "payment_released",
-          related_id: contract.id,
+          title: "Payment Auto-Released",
           message: `Payment for "${contract.project?.title}" was auto-released after the approval period expired.`,
+          type: "payment",
+          related_contract_id: contract.id,
         });
 
         releasedCount++;
