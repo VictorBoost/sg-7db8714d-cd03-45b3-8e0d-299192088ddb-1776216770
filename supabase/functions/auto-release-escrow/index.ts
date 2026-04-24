@@ -1,82 +1,71 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import Stripe from "https://esm.sh/stripe@14.21.0";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+  apiVersion: "2024-12-18.acacia",
+});
 
 serve(async (req) => {
   try {
-    console.log("🔄 Auto-release escrow cron job started");
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
 
-    // FOR TESTING: Use 10 seconds (0.00278 hours)
-    // FOR PRODUCTION: Use 48 hours
-    const RELEASE_WINDOW_HOURS = 0.00278; // 10 seconds for testing
+    console.log("Auto-release job started at:", new Date().toISOString());
 
-    // Find contracts eligible for auto-release
+    // Get auto-release window from settings (default 10 seconds for testing, 172800 for 48 hours production)
+    const { data: settingsData } = await supabaseClient
+      .from("platform_settings")
+      .select("setting_value")
+      .eq("setting_key", "auto_release_window_seconds")
+      .maybeSingle();
+
+    const windowSeconds = parseInt(settingsData?.setting_value || "10");
+    console.log("Auto-release window:", windowSeconds, "seconds");
+
+    // Find all contracts eligible for auto-release
     const now = new Date();
-    const releaseThreshold = new Date(now.getTime() - RELEASE_WINDOW_HOURS * 60 * 60 * 1000);
-
-    const { data: contracts, error: fetchError } = await supabase
+    const { data: eligibleContracts, error: fetchError } = await supabaseClient
       .from("contracts")
       .select(`
         id,
         stripe_payment_intent_id,
-        project:projects(title),
-        provider:profiles!contracts_provider_id_fkey(full_name),
-        client:profiles!contracts_client_id_fkey(full_name)
+        provider_id,
+        client_id,
+        auto_release_eligible_at,
+        project:projects(title)
       `)
       .eq("payment_status", "held")
-      .not("stripe_payment_intent_id", "is", null)
-      .lte("auto_release_eligible_at", releaseThreshold.toISOString());
+      .not("auto_release_eligible_at", "is", null)
+      .lte("auto_release_eligible_at", now.toISOString());
 
     if (fetchError) {
-      console.error("Error fetching contracts:", fetchError);
-      return new Response(JSON.stringify({ error: fetchError.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      console.error("Error fetching eligible contracts:", fetchError);
+      throw fetchError;
     }
 
-    console.log(`Found ${contracts?.length || 0} contracts eligible for auto-release`);
+    console.log(`Found ${eligibleContracts?.length || 0} contracts eligible for auto-release`);
 
-    if (!contracts || contracts.length === 0) {
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: "No contracts eligible for auto-release",
-        released: 0
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    let releasedCount = 0;
+    const errors: any[] = [];
 
-    // Process each contract
-    const results = [];
-    for (const contract of contracts) {
+    for (const contract of eligibleContracts || []) {
       try {
-        console.log(`Processing contract ${contract.id}`);
+        console.log(`Processing contract ${contract.id}, payment intent: ${contract.stripe_payment_intent_id}`);
 
-        // Capture payment via Stripe
-        const captureResponse = await fetch("https://api.stripe.com/v1/payment_intents/" + contract.stripe_payment_intent_id + "/capture", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${stripeSecretKey}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        });
+        // Capture the payment in Stripe
+        await stripe.paymentIntents.capture(contract.stripe_payment_intent_id);
 
-        if (!captureResponse.ok) {
-          const error = await captureResponse.json();
-          console.error(`Failed to capture payment for contract ${contract.id}:`, error);
-          results.push({ contractId: contract.id, success: false, error: error.error?.message });
-          continue;
-        }
-
-        // Update contract status
-        const { error: updateError } = await supabase
+        // Update contract to released status
+        const { error: updateError } = await supabaseClient
           .from("contracts")
           .update({
             payment_status: "released",
@@ -87,46 +76,53 @@ serve(async (req) => {
 
         if (updateError) {
           console.error(`Failed to update contract ${contract.id}:`, updateError);
-          results.push({ contractId: contract.id, success: false, error: updateError.message });
+          errors.push({ contractId: contract.id, error: updateError });
           continue;
         }
 
-        // Send notification to provider
-        await supabase.from("notifications").insert({
-          user_id: contract.provider?.id,
+        // Create notification for provider
+        await supabaseClient.from("notifications").insert({
+          user_id: contract.provider_id,
           type: "payment_released",
           related_id: contract.id,
           message: `Payment for "${contract.project?.title}" has been auto-released. Funds will arrive in 2-3 business days.`,
         });
 
+        // Create notification for client
+        await supabaseClient.from("notifications").insert({
+          user_id: contract.client_id,
+          type: "payment_released",
+          related_id: contract.id,
+          message: `Payment for "${contract.project?.title}" was auto-released after the approval period expired.`,
+        });
+
+        releasedCount++;
         console.log(`✅ Successfully released payment for contract ${contract.id}`);
-        results.push({ contractId: contract.id, success: true });
       } catch (error) {
         console.error(`Error processing contract ${contract.id}:`, error);
-        results.push({ 
-          contractId: contract.id, 
-          success: false, 
-          error: error instanceof Error ? error.message : "Unknown error" 
-        });
+        errors.push({ contractId: contract.id, error: error instanceof Error ? error.message : String(error) });
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    console.log(`✅ Auto-release completed: ${successCount}/${contracts.length} successful`);
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      released: successCount,
-      total: contracts.length,
-      results,
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        releasedCount,
+        eligibleCount: eligibleContracts?.length || 0,
+        errors: errors.length > 0 ? errors : undefined,
+        timestamp: new Date().toISOString(),
+        windowSeconds,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
-    console.error("Fatal error in auto-release:", error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "Unknown error" 
+    console.error("Auto-release job error:", error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
     }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
