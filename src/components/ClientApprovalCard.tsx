@@ -48,7 +48,7 @@ export function ClientApprovalCard({
         providerId,
         "payment_released",
         contractId,
-        `Payment for "${projectTitle}" has been approved and released. Funds will arrive in 2-3 business days.`
+        "Payment for \"" + projectTitle + "\" has been approved and released. Funds will arrive in 2-3 business days."
       );
 
       toast({
