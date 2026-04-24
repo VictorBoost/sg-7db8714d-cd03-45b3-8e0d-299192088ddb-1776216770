@@ -39,12 +39,12 @@ export function Navigation() {
             <Link href="/projects" className="text-foreground hover:text-primary transition-colors">
               Browse Projects
             </Link>
-            <Link href="/directory" className="text-foreground hover:text-primary transition-colors">
-              Find Providers
-            </Link>
             
-            {session ? (
-              <>
+
+            
+            
+            {session ?
+            <>
                 <Link href="/post-project">
                   <Button className="bg-primary hover:bg-primary/90">
                     Post a Project
@@ -53,9 +53,9 @@ export function Navigation() {
                 <Link href="/account" className="text-foreground hover:text-primary transition-colors">
                   Account
                 </Link>
-              </>
-            ) : (
-              <>
+              </> :
+
+            <>
                 <Link href="/login">
                   <Button variant="ghost">Log in</Button>
                 </Link>
@@ -65,53 +65,53 @@ export function Navigation() {
                   </Button>
                 </Link>
               </>
-            )}
+            }
           </div>
 
           {/* Mobile Menu Button */}
           <button
             className="md:hidden text-foreground"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-4 border-t">
-            <Link 
-              href="/projects" 
-              className="block text-foreground hover:text-primary transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+        {mobileMenuOpen &&
+        <div className="md:hidden py-4 space-y-4 border-t">
+            <Link
+            href="/projects"
+            className="block text-foreground hover:text-primary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}>
+            
               Browse Projects
             </Link>
-            <Link 
-              href="/directory" 
-              className="block text-foreground hover:text-primary transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+            <Link
+            href="/directory"
+            className="block text-foreground hover:text-primary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}>
+            
               Find Providers
             </Link>
             
-            {session ? (
-              <>
+            {session ?
+          <>
                 <Link href="/post-project" onClick={() => setMobileMenuOpen(false)}>
                   <Button className="w-full bg-primary hover:bg-primary/90">
                     Post a Project
                   </Button>
                 </Link>
-                <Link 
-                  href="/account" 
-                  className="block text-foreground hover:text-primary transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link
+              href="/account"
+              className="block text-foreground hover:text-primary transition-colors"
+              onClick={() => setMobileMenuOpen(false)}>
+              
                   Account
                 </Link>
-              </>
-            ) : (
-              <div className="space-y-2">
+              </> :
+
+          <div className="space-y-2">
                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="outline" className="w-full">Log in</Button>
                 </Link>
@@ -121,10 +121,10 @@ export function Navigation() {
                   </Button>
                 </Link>
               </div>
-            )}
+          }
           </div>
-        )}
+        }
       </div>
-    </nav>
-  );
+    </nav>);
+
 }

@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { Plus, Search, Filter } from "lucide-react";
-import { projectService } from "@/services/projectService";
+import { Plus, Search, Filter, Shield, LogIn, UserPlus } from "lucide-react";
 import { categoryService } from "@/services/categoryService";
 import { subcategoryService } from "@/services/subcategoryService";
+import { authService } from "@/services/authService";
 import type { Tables } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { useRouter } from "next/router";
 
 type Project = Tables<"projects">;
 type Category = Tables<"categories">;
@@ -26,24 +29,62 @@ const NZ_CITIES = [
   "Hastings", "Invercargill", "Upper Hutt", "Whanganui", "Gisborne"
 ];
 
+const OWNER_EMAIL = "bluetikanz@gmail.com";
+
 export default function Projects() {
-  const [projects, setProjects] = useState<(Project & { category?: any, subcategory?: any })[]>([]);
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [projects, setProjects] = useState<(Project & { category?: any, subcategory?: any, bid_count?: number, contract?: any })[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [subcategoryFilter, setSubcategoryFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    loadCategories();
-    loadProjects();
-  }, [statusFilter]);
+    checkAuthentication();
+  }, []);
+
+  const checkAuthentication = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+      
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error("Auth check error:", error);
+      router.push("/login");
+    } finally {
+      setCheckingAuth(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadCurrentUser();
+      loadCategories();
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (authChecked && currentUser) {
+      loadProjects();
+    }
+  }, [authChecked, currentUser]);
 
   useEffect(() => {
     if (categoryFilter !== "all") {
@@ -53,6 +94,14 @@ export default function Projects() {
       setSubcategoryFilter("all");
     }
   }, [categoryFilter]);
+
+  const loadCurrentUser = async () => {
+    const session = await authService.getCurrentSession();
+    const user = session?.user || null;
+    setCurrentUser(user);
+    setIsOwner(user?.email === OWNER_EMAIL);
+    setAuthChecked(true);
+  };
 
   const loadCategories = async () => {
     const { data } = await categoryService.getAllCategories();
@@ -70,27 +119,59 @@ export default function Projects() {
 
   const loadProjects = async () => {
     setLoading(true);
-    // Don't fetch bids on public page - they're private
-    const { data, error } = await supabase
-      .from("projects")
-      .select(`
-        *,
-        category:categories(name),
-        subcategory:subcategories(name)
-      `)
-      .order("created_at", { ascending: false });
     
-    console.log("Projects loaded:", { count: data?.length, error });
-    
-    if (!error && data) {
-      // Show all projects EXCEPT draft, cancelled, archived
-      const visibleProjects = data.filter((p: any) => 
-        p.status !== "draft" && p.status !== "cancelled" && p.status !== "archived"
-      );
+    if (isOwner) {
+      // OWNER VIEW: Show ALL projects with bid counts and contract info
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          *,
+          category:categories(name),
+          subcategory:subcategories(name),
+          bids(id),
+          contract:contracts(id, status, provider_id)
+        `)
+        .order("created_at", { ascending: false });
       
-      console.log("Visible projects:", visibleProjects.length);
-      setProjects(visibleProjects);
+      console.log("Owner view - all projects:", { count: data?.length, error });
+      
+      if (!error && data) {
+        const projectsWithStats = data.map((p: any) => ({
+          ...p,
+          bid_count: Array.isArray(p.bids) ? p.bids.length : 0,
+          contract: Array.isArray(p.contract) ? p.contract[0] : null
+        }));
+        setProjects(projectsWithStats);
+      }
+    } else {
+      // CLIENT/PROVIDER VIEW: Only show open projects without accepted contracts
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          *,
+          category:categories(name),
+          subcategory:subcategories(name)
+        `)
+        .eq("status", "open")
+        .order("created_at", { ascending: false });
+      
+      console.log("User view - open projects:", { count: data?.length, error });
+      
+      if (!error && data) {
+        // Filter out projects that have accepted contracts
+        const { data: contractedProjects } = await supabase
+          .from("contracts")
+          .select("project_id")
+          .neq("status", "cancelled");
+        
+        const contractedIds = new Set((contractedProjects || []).map((c: any) => c.project_id));
+        const availableProjects = data.filter((p: any) => !contractedIds.has(p.id));
+        
+        console.log("Filtered projects (no contracts):", availableProjects.length);
+        setProjects(availableProjects);
+      }
     }
+    
     setLoading(false);
   };
 
@@ -119,6 +200,21 @@ export default function Projects() {
 
   const isDomesticHelperCategory = categories.find(c => c.id === categoryFilter)?.name === "Domestic Helper";
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <>
       <SEO 
@@ -133,8 +229,18 @@ export default function Projects() {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h1 className="text-4xl font-bold mb-2">Browse Projects</h1>
-                <p className="text-muted-foreground">Find opportunities that match your skills</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-4xl font-bold">Browse Projects</h1>
+                  {isOwner && (
+                    <Badge variant="default" className="bg-accent">
+                      <Shield className="w-3 h-3 mr-1" />
+                      Owner View
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground mt-2">
+                  {isOwner ? "Viewing all projects (testing/moderation mode)" : "Find opportunities that match your skills"}
+                </p>
               </div>
               <Button asChild size="lg">
                 <Link href="/post-project">
@@ -249,19 +355,24 @@ export default function Projects() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={statusFilter} onValueChange={(v: typeof statusFilter) => setStatusFilter(v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Active</SelectItem>
-                      <SelectItem value="open">Open for Bids</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isOwner && (
+                  <div className="space-y-2">
+                    <Label>Status (Owner Only)</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="open">Open</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 mt-4">
@@ -275,6 +386,7 @@ export default function Projects() {
                     setBudgetMin("");
                     setBudgetMax("");
                     setDateFilter("all");
+                    setStatusFilter("all");
                     setSearchTerm("");
                   }}
                 >
@@ -301,7 +413,7 @@ export default function Projects() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProjects.map(project => (
-                  <ProjectCard key={project.id} project={project} />
+                  <ProjectCard key={project.id} project={project} isOwner={isOwner} />
                 ))}
               </div>
             )}

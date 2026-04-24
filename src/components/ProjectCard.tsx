@@ -10,13 +10,16 @@ import { ReportModal } from "./ReportModal";
 type Project = Tables<"projects"> & {
   category?: { name: string };
   subcategory?: { name: string };
+  bid_count?: number;
+  contract?: { id: string; status: string; provider_id: string } | null;
 };
 
 interface ProjectCardProps {
   project: Project;
+  isOwner?: boolean;
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, isOwner }: ProjectCardProps) {
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
   const statusColors = {
@@ -57,12 +60,22 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <Card className="hover:border-primary/50 transition-colors">
         <CardHeader>
           <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Badge variant="outline" className={statusColors[project.status]}>
                 {project.status.replace("_", " ")}
               </Badge>
               {project.is_expired && (
                 <Badge variant="destructive">Expired</Badge>
+              )}
+              {isOwner && project.bid_count !== undefined && (
+                <Badge variant="secondary">
+                  {project.bid_count} {project.bid_count === 1 ? 'bid' : 'bids'}
+                </Badge>
+              )}
+              {isOwner && project.contract && (
+                <Badge variant="default" className="bg-accent">
+                  Contract: {project.contract.status}
+                </Badge>
               )}
             </div>
             <Button
