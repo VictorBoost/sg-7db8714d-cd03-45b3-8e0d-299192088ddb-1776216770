@@ -27,7 +27,7 @@ const NZ_CITIES = [
 ];
 
 export default function Projects() {
-  const [projects, setProjects] = useState<(Project & { bid_count: number })[]>([]);
+  const [projects, setProjects] = useState<(Project & { category?: any, subcategory?: any })[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
