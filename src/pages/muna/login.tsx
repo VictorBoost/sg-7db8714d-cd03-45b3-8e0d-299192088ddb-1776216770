@@ -34,8 +34,8 @@ export default function MunaLogin() {
         throw new Error(data.error || "Login failed");
       }
 
-      if (!data.isAdmin) {
-        throw new Error("Access denied. Admin privileges required.");
+      if (!data.isOwner) {
+        throw new Error("Access denied. Owner privileges required.");
       }
 
       toast({
@@ -77,9 +77,9 @@ export default function MunaLogin() {
                 <Shield className="h-8 w-8 text-white" />
               </div>
             </div>
-            <CardTitle className="text-2xl">Admin Login</CardTitle>
+            <CardTitle className="text-2xl">Owner Login</CardTitle>
             <CardDescription>
-              Access restricted to authorized administrators only
+              Access restricted to platform owner only
             </CardDescription>
           </CardHeader>
           <CardContent>
