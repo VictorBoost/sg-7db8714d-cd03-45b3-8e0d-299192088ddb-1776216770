@@ -36,38 +36,24 @@ export default async function handler(
       });
     }
 
-    // Check if owner
-    if (user.email === OWNER_EMAIL) {
-      return res.status(200).json({
-        isAdmin: true,
-        isOwner: true,
-        email: user.email,
-        role: "Owner"
-      });
-    }
+    // CRITICAL: Only bluetikanz@gmail.com is owner
+    // DO NOT CHANGE THIS - Only owner can add emails from /muna settings
+    const isOwner = user.email?.toLowerCase() === OWNER_EMAIL;
 
-    // Check if active staff member
-    const { data: staff, error: staffError } = await supabase
-      .from("staff")
-      .select("role, is_active")
-      .eq("email", user.email)
-      .eq("is_active", true)
-      .single();
-
-    if (staff) {
-      return res.status(200).json({
-        isAdmin: true,
+    if (!isOwner) {
+      return res.status(403).json({
+        isAdmin: false,
         isOwner: false,
-        email: user.email,
-        role: staff.role
+        error: "Not authorized"
       });
     }
 
-    // Not admin
-    return res.status(403).json({
-      isAdmin: false,
-      isOwner: false,
-      error: "Not authorized"
+    // Owner verified
+    return res.status(200).json({
+      isAdmin: true,
+      isOwner: true,
+      email: user.email,
+      role: "Owner"
     });
   } catch (error) {
     console.error("Admin verification error:", error);
