@@ -22,13 +22,18 @@ export default function MunaLogin() {
     setLoading(true);
 
     try {
+      console.log("Attempting login...");
       const response = await fetch("/api/auth/muna-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email, password: formData.password }),
+        body: JSON.stringify({ 
+          email: formData.email.trim(), 
+          password: formData.password 
+        }),
       });
 
       const data = await response.json();
+      console.log("Login response:", { status: response.status, data });
 
       if (!response.ok) {
         throw new Error(data.error || "Login failed");
@@ -40,11 +45,15 @@ export default function MunaLogin() {
 
       toast({
         title: "Access granted",
-        description: `Welcome, ${data.role}`,
+        description: "Welcome, Owner",
       });
 
-      router.push("/muna");
+      // Small delay to ensure cookie is set
+      setTimeout(() => {
+        router.push("/muna");
+      }, 100);
     } catch (error) {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
         description: error instanceof Error ? error.message : "Invalid credentials",
