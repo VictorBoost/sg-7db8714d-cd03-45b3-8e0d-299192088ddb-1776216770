@@ -1,9 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Star, TrendingUp, MapPin, Briefcase, FileText, Flag } from "lucide-react";
+import { Star, TrendingUp, MapPin, Briefcase, FileText, Flag, User } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { useState, useEffect } from "react";
 import { ReportModal } from "./ReportModal";
@@ -68,7 +68,14 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-start justify-between gap-4">
-              <DialogTitle className="text-2xl">Service Provider Profile</DialogTitle>
+              <div>
+                <DialogTitle className="text-2xl">{provider.full_name || "Service Provider"}</DialogTitle>
+                {memberSince && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Member since {memberSince}
+                  </p>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -80,16 +87,23 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
             </div>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {/* Header Info */}
-            <div>
-              <h3 className="text-xl font-semibold mb-1">{provider.full_name || "Service Provider"}</h3>
-              {memberSince && (
-                <p className="text-sm text-muted-foreground mb-3">
-                  Member since {memberSince}
-                </p>
-              )}
-              
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview">
+                <User className="h-4 w-4 mr-2" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="credentials">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Credentials
+              </TabsTrigger>
+              <TabsTrigger value="reviews">
+                <Star className="h-4 w-4 mr-2" />
+                Reviews ({publicReviews.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6 mt-6">
               {!loadingBadges && badges.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {badges.map((badge) => (
@@ -97,105 +111,103 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
                   ))}
                 </div>
               )}
-            </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              {rating > 0 && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-5 w-5 fill-yellow-500 text-yellow-500" />
-                      <div>
-                        <p className="text-2xl font-bold">{rating.toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">{reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {responseRate > 0 && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-accent" />
-                      <div>
-                        <p className="text-2xl font-bold">{responseRate}%</p>
-                        <p className="text-sm text-muted-foreground">Response rate</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Location */}
-            {provider.location && (
-              <div>
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <MapPin className="h-4 w-4" />
-                  <span className="text-sm font-medium">Location</span>
-                </div>
-                <p>{provider.location}</p>
-              </div>
-            )}
-
-            {/* Bio */}
-            {provider.bio && (
-              <div>
-                <h4 className="font-semibold mb-2">About</h4>
-                <p className="text-muted-foreground whitespace-pre-wrap">{provider.bio}</p>
-              </div>
-            )}
-
-            {/* Service Categories */}
-            {provider.provider_categories && provider.provider_categories.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  <h4 className="font-semibold">Service Categories</h4>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {provider.provider_categories.map((pc, idx) => (
-                    <Badge key={idx} variant="secondary">
-                      {pc.categories.name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Trade Certificates */}
-            {provider.trade_certificates && provider.trade_certificates.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <h4 className="font-semibold">Trade Certificates</h4>
-                </div>
-                <div className="space-y-2">
-                  {provider.trade_certificates.map((cert, idx) => (
-                    <a
-                      key={idx}
-                      href={cert.document_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
+              <div className="grid grid-cols-2 gap-4">
+                {rating > 0 && (
+                  <Card>
+                    <CardContent className="pt-6">
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{cert.certificate_type}</span>
+                        <Star className="h-5 w-5 fill-yellow-500 text-yellow-500" />
+                        <div>
+                          <p className="text-2xl font-bold">{rating.toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">{reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}</p>
+                        </div>
                       </div>
-                    </a>
-                  ))}
-                </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {responseRate > 0 && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-accent" />
+                        <div>
+                          <p className="text-2xl font-bold">{responseRate}%</p>
+                          <p className="text-sm text-muted-foreground">Response rate</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-            )}
 
-            <Separator />
+              {provider.location && (
+                <div>
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm font-medium">Location</span>
+                  </div>
+                  <p>{provider.location}</p>
+                </div>
+              )}
 
-            {/* Reviews */}
-            <div>
-              <h4 className="font-semibold mb-4">Reviews ({publicReviews.length})</h4>
+              {provider.bio && (
+                <div>
+                  <h4 className="font-semibold mb-2">About</h4>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{provider.bio}</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="credentials" className="space-y-6 mt-6">
+              {provider.provider_categories && provider.provider_categories.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="font-semibold">Service Categories</h4>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {provider.provider_categories.map((pc, idx) => (
+                      <Badge key={idx} variant="secondary">
+                        {pc.categories.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {provider.trade_certificates && provider.trade_certificates.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="font-semibold">Trade Certificates</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {provider.trade_certificates.map((cert, idx) => (
+                      <a
+                        key={idx}
+                        href={cert.document_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">{cert.certificate_type}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(!provider.provider_categories || provider.provider_categories.length === 0) &&
+               (!provider.trade_certificates || provider.trade_certificates.length === 0) && (
+                <p className="text-muted-foreground text-center py-8">No credentials available</p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="reviews" className="space-y-4 mt-6">
               {publicReviews.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No reviews yet</p>
               ) : (
@@ -228,8 +240,8 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
                   ))}
                 </div>
               )}
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
