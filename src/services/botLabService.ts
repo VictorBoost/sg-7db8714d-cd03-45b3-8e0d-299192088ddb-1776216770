@@ -272,29 +272,21 @@ export const botLabService = {
 
       // 4. Delete child records using the IDs directly
       if (contractIds.length > 0) {
-        // @ts-expect-error - Supabase types can be excessively deep
         await supabase.from("evidence_photos").delete().in("contract_id", contractIds);
-        // @ts-expect-error - Supabase types can be excessively deep
         await supabase.from("contract_messages").delete().in("contract_id", contractIds);
-        // @ts-expect-error - Supabase types can be excessively deep
         await supabase.from("reviews").delete().in("contract_id", contractIds);
-        // @ts-expect-error - Supabase types can be excessively deep
         await supabase.from("contracts").delete().in("id", contractIds);
       }
 
       if (projectIds.length > 0) {
-        // @ts-expect-error - Supabase types can be excessively deep
         await supabase.from("bids").delete().in("project_id", projectIds);
-        // @ts-expect-error - Supabase types can be excessively deep
         await supabase.from("projects").delete().in("id", projectIds);
       }
 
       // 5. Delete bids from provider bots
-      // @ts-expect-error - Supabase types can be excessively deep
       await supabase.from("bids").delete().in("provider_id", profileIds);
 
       // 6. Bot activity logs
-      // @ts-expect-error - Supabase types can be excessively deep
       await supabase.from("bot_activity_logs").delete().in("bot_id", profileIds);
 
       // 7. Delete bot_accounts
