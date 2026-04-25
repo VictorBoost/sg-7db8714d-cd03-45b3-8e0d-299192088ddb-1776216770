@@ -30,9 +30,14 @@ Create a real-time dashboard in /muna showing all bot activities:
 - [x] Add auto-refresh toggle (30 seconds)
 - [x] Style with consistent Muna dashboard theme
 - [x] Add stats cards (total activities, by type)
+- [x] Fix TypeScript errors (admin verification, stats state)
+- [x] Update bot reviews to be realistic and category-specific
+- [x] Add before/after evidence photos with realistic captions
 
 ## Acceptance
-- Dashboard shows real-time bot activities
-- Filtering works correctly
-- Auto-refresh updates every 30 seconds
-- Clear presentation of all bot actions
+- Dashboard shows real-time bot activities ✓
+- Filtering works correctly ✓
+- Auto-refresh updates every 30 seconds ✓
+- Clear presentation of all bot actions ✓
+- Bot reviews explain how BlueTika helps both sides ✓
+- Evidence photos uploaded with realistic captions ✓
