@@ -1,24 +1,27 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { sesEmailService } from "@/services/sesEmailService";
+
+type Project = Tables<"projects">;
 
 export const projectService = {
-  async createProject(projectData: any): Promise<Tables<"projects">> {
+  async createProject(projectData: any) {
     const { data, error } = await supabase
       .from("projects")
       .insert([projectData])
       .select()
       .single();
 
-    if (error) throw error;
-    
-    // Ping sitemap to notify search engines of new project
-    try {
-      await fetch("/api/ping-sitemap", { method: "POST" });
-    } catch (e) {
-      console.log("Sitemap ping failed (non-critical):", e);
+    if (!error) {
+      // Ping sitemap to notify search engines of new project
+      try {
+        fetch("/api/ping-sitemap", { method: "POST" }).catch(e => console.log("Sitemap ping failed:", e));
+      } catch (e) {
+        console.log("Sitemap ping failed (non-critical):", e);
+      }
     }
 
-    return data;
+    return { data, error };
   },
 
   async checkAndSendFirstProjectEmail(userId: string, project: Project): Promise<void> {
