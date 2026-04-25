@@ -1,30 +1,28 @@
-# robots.txt for bluetika.co.nz
+# BlueTika Robots.txt
+# https://bluetika.co.nz/robots.txt
+
 User-agent: *
 Allow: /
 
-# Public pages
-Allow: /about
-Allow: /projects
-Allow: /directory
-Allow: /register
-Allow: /login
-
-# Block admin and private areas
+# Disallow admin areas
 Disallow: /muna/
-Disallow: /account
-Disallow: /contracts
-Disallow: /my-bids
+Disallow: /api/
 Disallow: /checkout/
 Disallow: /checkout-additional/
-Disallow: /api/
 
-# Block auth pages
-Disallow: /auth/
+# Disallow auth pages
+Disallow: /login
+Disallow: /register
 Disallow: /forgot-password
+Disallow: /auth/
 
-# Block provider verification (private process)
-Disallow: /provider/verify
-Disallow: /provider/verify-domestic-helper
+# Allow important pages
+Allow: /projects
+Allow: /categories/
+Allow: /directory
+Allow: /about
+Allow: /contact
+Allow: /faq
 
-# Sitemap location
-Sitemap: https://bluetika.co.nz/sitemap.xml
+# Dynamic sitemap (auto-updated)
+Sitemap: https://bluetika.co.nz/api/sitemap.xml
