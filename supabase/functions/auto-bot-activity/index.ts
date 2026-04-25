@@ -34,44 +34,9 @@ serve(async (req) => {
       );
     }
 
-    // Check last run time to implement 1-6 hour randomized interval
-    const { data: lastRunSetting } = await supabaseClient
-      .from("platform_settings")
-      .select("setting_value")
-      .eq("setting_key", "bot_last_activity_run")
-      .single();
-
+    // TEMPORARILY SKIP TIME CHECK - Always run when called for testing
     const now = new Date();
-    let shouldRun = true;
-    let nextRunTime = null;
-
-    if (lastRunSetting?.setting_value) {
-      const lastRun = new Date(lastRunSetting.setting_value);
-      const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
-      
-      // Random interval between 1-6 hours
-      const randomInterval = 1 + Math.random() * 5; // 1-6 hours
-      
-      if (hoursSinceLastRun < randomInterval) {
-        shouldRun = false;
-        nextRunTime = new Date(lastRun.getTime() + randomInterval * 60 * 60 * 1000);
-        console.log(`⏰ AUTO-BOT-ACTIVITY: Not enough time passed. Last run: ${hoursSinceLastRun.toFixed(2)}h ago, next run in ${(randomInterval - hoursSinceLastRun).toFixed(2)}h`);
-      }
-    }
-
-    if (!shouldRun) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Waiting for next scheduled run", 
-          skipped: true,
-          nextRunTime: nextRunTime?.toISOString()
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("🚀 AUTO-BOT-ACTIVITY: Starting automatic activity cycle");
+    console.log("🚀 AUTO-BOT-ACTIVITY: Starting automatic activity cycle (time check bypassed for testing)");
 
     const results = {
       projects: 0,

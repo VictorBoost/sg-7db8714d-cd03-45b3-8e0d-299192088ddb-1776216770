@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -567,6 +567,7 @@ export type Database = {
           action_type: string
           bot_id: string
           created_at: string | null
+          details: Json | null
           error_message: string | null
           id: string
           metadata: Json | null
@@ -577,6 +578,7 @@ export type Database = {
           action_type: string
           bot_id: string
           created_at?: string | null
+          details?: Json | null
           error_message?: string | null
           id?: string
           metadata?: Json | null
@@ -587,6 +589,7 @@ export type Database = {
           action_type?: string
           bot_id?: string
           created_at?: string | null
+          details?: Json | null
           error_message?: string | null
           id?: string
           metadata?: Json | null
