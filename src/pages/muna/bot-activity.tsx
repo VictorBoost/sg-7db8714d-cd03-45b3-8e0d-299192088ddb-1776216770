@@ -40,16 +40,7 @@ export default function BotActivityPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [activities, setActivities] = useState<BotActivityLog[]>([]);
-  const [stats, setStats] = useState<ActivityStats>({
-    total: 0,
-    post_project: 0,
-    submit_bid: 0,
-    accept_bid: 0,
-    complete_work: 0,
-    submit_review: 0,
-    make_payment: 0,
-  });
+  const [activities, setActivities] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<string>("all");
   const [autoRefresh, setAutoRefresh] = useState(false);
 
@@ -61,19 +52,14 @@ export default function BotActivityPage() {
     if (!loading) {
       loadActivities();
     }
-  }, [filterType]);
+  }, [loading, filterType]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (autoRefresh) {
-      interval = setInterval(() => {
-        loadActivities();
-      }, 30000); // Refresh every 30 seconds
+    if (autoRefresh && !loading) {
+      const interval = setInterval(loadActivities, 30000);
+      return () => clearInterval(interval);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, filterType]);
+  }, [autoRefresh, loading]);
 
   const checkAuth = async () => {
     try {
