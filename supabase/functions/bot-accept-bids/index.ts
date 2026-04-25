@@ -50,12 +50,12 @@ serve(async (req) => {
     if (!projects || projects.length === 0) {
       console.log("⚠️ BOT-ACCEPT-BIDS: No projects with pending bids");
       return new Response(
-        JSON.stringify({ success: true, message: "No projects with pending bids", accepted: 0 }),
+        JSON.stringify({ success: true, message: "No projects with pending bids", accepted: 0, paid: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const results = { accepted: 0, errors: [] as string[] };
+    const results = { accepted: 0, paid: 0, errors: [] as string[] };
 
     console.log(`🎯 BOT-ACCEPT-BIDS: Starting to accept bids for ${projects.length} projects`);
 
@@ -145,20 +145,47 @@ serve(async (req) => {
           });
 
         results.accepted++;
-        console.log(`  📊 BOT-ACCEPT-BIDS: Total contracts created so far: ${results.accepted}`);
+
+        // AUTOMATICALLY TRIGGER PAYMENT FOR BOT CONTRACTS
+        console.log(`  💳 BOT-ACCEPT-BIDS: Triggering automatic payment for contract ${newContract.id}`);
+        try {
+          const paymentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/bot-make-payment`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify({ contractId: newContract.id }),
+          });
+
+          if (paymentResponse.ok) {
+            const paymentData = await paymentResponse.json();
+            console.log(`  ✅ BOT-ACCEPT-BIDS: Payment successful: ${paymentData.paymentIntentId}`);
+            results.paid++;
+          } else {
+            const error = await paymentResponse.text();
+            console.error(`  ❌ BOT-ACCEPT-BIDS: Payment failed:`, error);
+            results.errors.push(`Payment failed for contract ${newContract.id}: ${error}`);
+          }
+        } catch (paymentError: any) {
+          console.error(`  ❌ BOT-ACCEPT-BIDS: Payment exception:`, paymentError);
+          results.errors.push(`Payment exception for contract ${newContract.id}: ${paymentError.message}`);
+        }
+
+        console.log(`  📊 BOT-ACCEPT-BIDS: Total contracts created: ${results.accepted}, Total paid: ${results.paid}`);
       } catch (err: any) {
         console.error(`  ❌ BOT-ACCEPT-BIDS: Exception processing project:`, err);
         results.errors.push(`Error: ${err.message}`);
       }
     }
 
-    console.log(`\n🎉 BOT-ACCEPT-BIDS: COMPLETE! Accepted ${results.accepted} bids with ${results.errors.length} errors`);
+    console.log(`\n🎉 BOT-ACCEPT-BIDS: COMPLETE! Accepted ${results.accepted} bids, ${results.paid} paid, ${results.errors.length} errors`);
     if (results.errors.length > 0) {
       console.log("❌ BOT-ACCEPT-BIDS: Errors encountered:", results.errors);
     }
 
     return new Response(
-      JSON.stringify({ success: true, accepted: results.accepted, errors: results.errors }),
+      JSON.stringify({ success: true, accepted: results.accepted, paid: results.paid, errors: results.errors }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
@@ -166,7 +193,7 @@ serve(async (req) => {
     console.error("💥 BOT-ACCEPT-BIDS: Error message:", error.message);
     console.error("💥 BOT-ACCEPT-BIDS: Error stack:", error.stack);
     return new Response(
-      JSON.stringify({ success: false, error: error.message, accepted: 0 }),
+      JSON.stringify({ success: false, error: error.message, accepted: 0, paid: 0 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
