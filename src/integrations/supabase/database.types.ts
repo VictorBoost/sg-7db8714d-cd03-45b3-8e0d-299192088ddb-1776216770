@@ -2423,6 +2423,9 @@ export type Database = {
           is_expired: boolean | null
           last_reopened_at: string | null
           location: string
+          meta_description: string | null
+          meta_keywords: string | null
+          meta_title: string | null
           photos: string[] | null
           reopened_count: number | null
           routine_custom_days: number | null
@@ -2454,6 +2457,9 @@ export type Database = {
           is_expired?: boolean | null
           last_reopened_at?: string | null
           location: string
+          meta_description?: string | null
+          meta_keywords?: string | null
+          meta_title?: string | null
           photos?: string[] | null
           reopened_count?: number | null
           routine_custom_days?: number | null
@@ -2485,6 +2491,9 @@ export type Database = {
           is_expired?: boolean | null
           last_reopened_at?: string | null
           location?: string
+          meta_description?: string | null
+          meta_keywords?: string | null
+          meta_title?: string | null
           photos?: string[] | null
           reopened_count?: number | null
           routine_custom_days?: number | null

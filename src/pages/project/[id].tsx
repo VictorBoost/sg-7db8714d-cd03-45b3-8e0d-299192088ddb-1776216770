@@ -484,8 +484,8 @@ export default function ProjectDetail() {
   return (
     <>
       <SEO 
-        title={`${project.title} - BlueTika`}
-        description={project.description}
+        title={project.meta_title || `${project.title} - BlueTika`}
+        description={project.meta_description || project.description}
       />
       <div className="min-h-screen flex flex-col bg-background">
         <header className="border-b bg-card">
