@@ -31,6 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const contractId = paymentIntent.metadata.contractId;
       const isAdditionalCharge = paymentIntent.metadata.additional_charge_id;
+      const isBot = paymentIntent.metadata.isBot === "true";
+
+      console.log(`💳 Webhook: Payment succeeded - Contract: ${contractId}, IsBot: ${isBot}`);
 
       if (isAdditionalCharge) {
         const { data: charge } = await supabase.from("additional_charges").update({ status: "paid" } as any).eq("id", isAdditionalCharge).select(`*, contract:contracts(project:projects(title, client:profiles!projects_client_id_fkey(email, full_name)), provider:profiles!contracts_provider_id_fkey(email, full_name))`).single();
@@ -45,22 +48,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await emailLogService.logEmail((charge.contract as any).project.client.email, "charge_confirmed", clientEmailSent ? "sent" : "failed", { charge_id: isAdditionalCharge });
         }
       } else if (contractId) {
-        const { data: contract } = await supabase.from("contracts").update({ payment_status: "paid" } as any).eq("id", contractId).select(`*, project:projects(title, client:profiles!projects_client_id_fkey(email, full_name)), provider:profiles!contracts_provider_id_fkey(email, full_name)`).single();
+        // For bot payments, set status to 'held' (funds in escrow)
+        // For regular payments, also set to 'held' for escrow
+        const { data: contract } = await supabase.from("contracts").update({ 
+          payment_status: "held",
+          stripe_payment_intent_id: paymentIntent.id 
+        } as any).eq("id", contractId).select(`*, project:projects(title, client:profiles!projects_client_id_fkey(email, full_name)), provider:profiles!contracts_provider_id_fkey(email, full_name)`).single();
 
-        if (contract && (contract as any).provider) {
-          const providerEmailSent = await sesEmailService.sendEmail({ to: (contract as any).provider.email, subject: "Payment Received", htmlBody: "<p>Payment received</p>" });
-          await emailLogService.logEmail((contract as any).provider.email, "payment_received", providerEmailSent ? "sent" : "failed", { contract_id: contractId });
-        }
+        console.log(`✅ Webhook: Updated contract ${contractId} to 'held' status`);
 
-        if (contract && (contract as any).project?.client) {
-          const clientEmailSent = await sesEmailService.sendEmail({ to: (contract as any).project.client.email, subject: "Payment Confirmed", htmlBody: "<p>Payment Confirmed</p>" });
-          await emailLogService.logEmail((contract as any).project.client.email, "payment_confirmed", clientEmailSent ? "sent" : "failed", { contract_id: contractId });
+        // Only send emails for non-bot contracts
+        if (!isBot && contract) {
+          if ((contract as any).provider) {
+            const providerEmailSent = await sesEmailService.sendEmail({ to: (contract as any).provider.email, subject: "Payment Received", htmlBody: "<p>Payment received and held in escrow</p>" });
+            await emailLogService.logEmail((contract as any).provider.email, "payment_received", providerEmailSent ? "sent" : "failed", { contract_id: contractId });
+          }
 
-          try {
-            const receipt = await receiptService.generateReceipt(contractId);
-            if (receipt) await receiptService.sendClientReceipt(receipt);
-          } catch (e) {
-            console.error("Receipt error", e);
+          if ((contract as any).project?.client) {
+            const clientEmailSent = await sesEmailService.sendEmail({ to: (contract as any).project.client.email, subject: "Payment Confirmed", htmlBody: "<p>Payment held in escrow until work completion</p>" });
+            await emailLogService.logEmail((contract as any).project.client.email, "payment_confirmed", clientEmailSent ? "sent" : "failed", { contract_id: contractId });
+
+            try {
+              const receipt = await receiptService.generateReceipt(contractId);
+              if (receipt) await receiptService.sendClientReceipt(receipt);
+            } catch (e) {
+              console.error("Receipt error", e);
+            }
           }
         }
       }
@@ -68,6 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.status(200).json({ received: true });
   } catch (error: any) {
+    console.error("Webhook error:", error);
     res.status(500).json({ error: "Webhook processing failed." });
   }
 }
