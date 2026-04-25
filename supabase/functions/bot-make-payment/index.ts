@@ -15,11 +15,14 @@ serve(async (req) => {
     const { contractId } = await req.json();
 
     if (!contractId) {
+      console.error("❌ No contract ID provided");
       return new Response(
         JSON.stringify({ error: "Contract ID is required" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
+
+    console.log(`💳 Processing bot payment for contract: ${contractId}`);
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -34,11 +37,14 @@ serve(async (req) => {
       .single();
 
     if (contractError || !contract) {
+      console.error("❌ Contract not found:", contractError);
       return new Response(
         JSON.stringify({ error: "Contract not found" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
       );
     }
+
+    console.log(`   Contract amount: $${contract.final_amount}`);
 
     // Verify this is a bot contract
     const { data: isBotClient } = await supabaseClient
@@ -48,11 +54,14 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!isBotClient) {
+      console.error("❌ Not a bot contract - client is not a bot");
       return new Response(
         JSON.stringify({ error: "Not a bot contract" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
       );
     }
+
+    console.log("   ✓ Verified as bot contract");
 
     // Calculate fees
     const baseAmount = parseFloat(contract.final_amount.toString());
@@ -61,11 +70,16 @@ serve(async (req) => {
     const paymentProcessingFee = baseAmount * 0.029 + 0.30;
     const totalAmount = baseAmount + paymentProcessingFee;
 
+    console.log(`   Base: $${baseAmount.toFixed(2)}, Fee: $${commissionAmount.toFixed(2)}, Total: $${totalAmount.toFixed(2)}`);
+
     // Create Stripe payment using test card
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
+      console.error("❌ Stripe key not configured");
       throw new Error("Stripe key not configured");
     }
+
+    console.log("   Creating Stripe payment intent...");
 
     // Create payment intent
     const piResponse = await fetch("https://api.stripe.com/v1/payment_intents", {
@@ -89,12 +103,15 @@ serve(async (req) => {
 
     if (!piResponse.ok) {
       const error = await piResponse.text();
+      console.error("❌ Stripe PI creation failed:", error);
       throw new Error(`Stripe PI creation failed: ${error}`);
     }
 
     const paymentIntent = await piResponse.json();
+    console.log(`   ✓ Payment Intent created: ${paymentIntent.id}`);
 
     // Create payment method with test card
+    console.log("   Creating test payment method...");
     const pmResponse = await fetch("https://api.stripe.com/v1/payment_methods", {
       method: "POST",
       headers: {
@@ -112,12 +129,15 @@ serve(async (req) => {
 
     if (!pmResponse.ok) {
       const error = await pmResponse.text();
+      console.error("❌ Stripe PM creation failed:", error);
       throw new Error(`Stripe PM creation failed: ${error}`);
     }
 
     const paymentMethod = await pmResponse.json();
+    console.log(`   ✓ Payment Method created: ${paymentMethod.id}`);
 
     // Confirm payment intent
+    console.log("   Confirming payment...");
     const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${paymentIntent.id}/confirm`, {
       method: "POST",
       headers: {
@@ -131,12 +151,15 @@ serve(async (req) => {
 
     if (!confirmResponse.ok) {
       const error = await confirmResponse.text();
+      console.error("❌ Stripe confirm failed:", error);
       throw new Error(`Stripe confirm failed: ${error}`);
     }
 
     const confirmedPI = await confirmResponse.json();
+    console.log(`   ✓ Payment confirmed: ${confirmedPI.status}`);
 
     // Update contract with payment details
+    console.log("   Updating contract...");
     const { error: updateError } = await supabaseClient
       .from("contracts")
       .update({
@@ -151,10 +174,11 @@ serve(async (req) => {
       .eq("id", contractId);
 
     if (updateError) {
+      console.error("❌ Contract update failed:", updateError);
       throw new Error(`Contract update failed: ${updateError.message}`);
     }
 
-    console.log(`✅ Bot payment created: Contract ${contractId}, Amount: $${totalAmount.toFixed(2)}`);
+    console.log(`✅ Bot payment complete: Contract ${contractId}, Amount: $${totalAmount.toFixed(2)}`);
 
     return new Response(
       JSON.stringify({
