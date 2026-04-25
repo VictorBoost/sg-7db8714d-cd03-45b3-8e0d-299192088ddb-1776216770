@@ -43,6 +43,15 @@ export default function BotActivityPage() {
   const [activities, setActivities] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<string>("all");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [stats, setStats] = useState<ActivityStats>({
+    total: 0,
+    post_project: 0,
+    submit_bid: 0,
+    accept_bid: 0,
+    complete_work: 0,
+    submit_review: 0,
+    make_payment: 0,
+  });
 
   useEffect(() => {
     checkAuth();
