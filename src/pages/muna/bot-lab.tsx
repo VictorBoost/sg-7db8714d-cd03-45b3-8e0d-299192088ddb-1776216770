@@ -114,12 +114,14 @@ export default function BotLab() {
         return;
       }
 
-      // Get recent bot activity (last 5 minutes)
+      // Get recent bot activity (last 5 minutes) using the profile IDs array
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
       const { data: recentProjects } = await supabase
         .from("projects")
         .select("id, title, budget, created_at")
         .in("client_id", profileIds)
-        .gte("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+        .gte("created_at", fiveMinutesAgo)
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -127,7 +129,7 @@ export default function BotLab() {
         .from("bids")
         .select("id, amount, created_at, projects(title)")
         .in("provider_id", profileIds)
-        .gte("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+        .gte("created_at", fiveMinutesAgo)
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -135,7 +137,7 @@ export default function BotLab() {
         .from("contracts")
         .select("id, final_amount, status, created_at")
         .in("client_id", profileIds)
-        .gte("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+        .gte("created_at", fiveMinutesAgo)
         .order("created_at", { ascending: false })
         .limit(5);
         
@@ -145,7 +147,7 @@ export default function BotLab() {
         .from("contract_messages")
         .select("id, message, contains_contact_info, created_at")
         .in("contract_id", contractIds)
-        .gte("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+        .gte("created_at", fiveMinutesAgo)
         .order("created_at", { ascending: false })
         .limit(5) : { data: [] };
 
