@@ -272,7 +272,7 @@ export const botLabService = {
 
       // 4. Delete child records using the IDs directly
       if (contractIds.length > 0) {
-        // Delete in batches or directly if array is manageable
+        // @ts-ignore - bypassing if table not in generated types yet
         await supabase.from("evidence_photos").delete().in("contract_id", contractIds);
         await supabase.from("contract_messages").delete().in("contract_id", contractIds);
         await supabase.from("reviews").delete().in("contract_id", contractIds);
