@@ -76,12 +76,17 @@ export default function BotActivityPage() {
   }, [autoRefresh, filterType]);
 
   const checkAuth = async () => {
-    const { user, isAdmin } = await authService.verifyAdmin();
-    if (!user || !isAdmin) {
+    try {
+      const response = await fetch("/api/auth/verify-admin");
+      if (!response.ok) {
+        router.push("/muna/login");
+        return;
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error("Auth check failed", error);
       router.push("/muna/login");
-      return;
     }
-    setLoading(false);
   };
 
   const loadActivities = async () => {
