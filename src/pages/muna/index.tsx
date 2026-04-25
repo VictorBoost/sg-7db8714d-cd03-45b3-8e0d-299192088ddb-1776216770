@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { DollarSign, Users, AlertCircle, FileCheck, Shield, Repeat, ShieldCheck, AlertTriangle, Percent, Tag, Calendar, ShieldAlert, Settings, Bot, BrainCircuit, Play, Eye, Lock, Activity, TrendingUp } from "lucide-react";
+import { DollarSign, Users, AlertCircle, FileCheck, Shield, Repeat, ShieldCheck, AlertTriangle, Percent, Tag, Calendar, ShieldAlert, Settings, Bot, BrainCircuit, Play, Eye, Lock, Activity, TrendingUp, FileText } from "lucide-react";
 import {
   getDashboardStats,
   type DashboardStats,
@@ -770,6 +771,42 @@ export default function ControlCentre() {
                     </div>
                   </CardContent>
                 </Card>
+              </div>
+
+              {/* Monitoring & Logs */}
+              <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Monitoring & Logs
+                </h2>
+                <div className="grid gap-4">
+                  <Link href="/muna/bot-activity">
+                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Bot className="h-5 w-5" />
+                          Bot Activity Dashboard
+                        </CardTitle>
+                        <CardDescription>
+                          Real-time monitoring of bot actions: bids, contracts, payments
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </Link>
+                  <Link href="/muna/monalisa-logs">
+                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          MonaLisa Activity Logs
+                        </CardTitle>
+                        <CardDescription>
+                          AI moderation decisions and content safety actions
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </Link>
+                </div>
               </div>
 
               {/* Management Links */}
