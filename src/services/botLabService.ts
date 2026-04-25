@@ -107,22 +107,16 @@ export const botLabService = {
     return {
       isActive: isEnabled,
       paymentsEnabled,
-      schedule: "Daily at random times between 6am-10pm NZST",
-      dailyBotCount: "20-30 bots per day",
-      actions: paymentsEnabled ? [
-        "Generate 20-30 new bot accounts",
-        "Bots post 5-8 project listings each",
-        "Bots submit 1-2 bids on other listings each", 
-        "Bots accept bids and create contracts",
-        "Bots complete Stripe payments (TEST MODE)",
-        "Bots upload before/after photos",
-        "Bots leave 4-5 star reviews"
-      ] : [
-        "Generate 20-30 new bot accounts",
-        "Bots post 5-8 project listings each",
-        "Bots submit 1-2 bids on other listings each",
-        "❌ Bot payments disabled - no contract acceptance",
-        "❌ No contract completion or reviews"
+      schedule: "Every 5-8 minutes (automatic)",
+      dailyBotCount: "Each bot runs full cycle",
+      actions: [
+        "✅ Post 1-5 projects per bot",
+        "✅ Submit 1-3 bids per bot",
+        "✅ Accept 1-2 bids and create contracts",
+        "✅ Complete Stripe payments (TEST MODE)",
+        "✅ Upload before/after photos",
+        "✅ Submit work for approval",
+        "🔄 Auto-release funds after 48 hours"
       ]
     };
   },
@@ -163,6 +157,47 @@ export const botLabService = {
     }
 
     return true;
+  },
+
+  async testBotPayment(contractId: string) {
+    try {
+      const response = await fetch('/api/bot-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractId })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Payment failed');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Payment test failed:", error);
+      throw error;
+    }
+  },
+
+  async runManualCycle() {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/hourly-bot-cycle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Cycle failed');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Manual cycle failed:", error);
+      throw error;
+    }
   },
 
   async generateBots(count: number = 50) {
@@ -331,6 +366,17 @@ export const botLabService = {
       .eq("bot_type", "client")
       .eq("is_active", true);
 
+    // Get payment stats
+    const { count: paidContracts } = await supabase
+      .from("contracts")
+      .select("*", { count: "exact", head: true })
+      .in("payment_status", ["held", "released"]);
+
+    const { count: completedContracts } = await supabase
+      .from("contracts")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "completed");
+
     // Get error logs
     const { data: errorLogs } = await supabase
       .from("bot_activity_logs")
@@ -350,6 +396,8 @@ export const botLabService = {
       totalBots: totalBots || 0,
       providerBots: providerBots || 0,
       clientBots: clientBots || 0,
+      paidContracts: paidContracts || 0,
+      completedContracts: completedContracts || 0,
       errorSummary,
       recentErrors: errorLogs?.filter(log => log.error_message).slice(0, 20) || []
     };
