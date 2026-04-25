@@ -9,7 +9,7 @@ The bot automation system is now running 24/7 with automatic Stripe payments.
 **Cron Job:** Every 5 minutes (`*/5 * * * *`)
 - **Edge Function:** `hourly-bot-cycle`
 - **Automatic:** YES - runs without manual intervention
-- **Database:** PostgreSQL cron job (pg_cron extension)
+- **Database:** PostgreSQL cron job (pg_cron + pg_net extensions enabled)
 
 ## 📋 Complete Bot Lifecycle
 
@@ -40,23 +40,27 @@ Each bot completes the following cycle every 5 minutes:
 
 **Payment Flow:**
 ```
-1. Create Payment Intent (automatic capture)
+1. Create Payment Intent (manual capture for escrow)
 2. Create Payment Method (test card)
 3. Confirm Payment Intent
 4. Update Contract:
    - payment_status: "held"
    - stripe_payment_intent_id: pi_xxx
-   - platform_fee: $16.00 (8%)
-   - payment_processing_fee: $6.10 (2.9% + $0.30)
-   - total_amount: $206.10
+   - platform_fee: 8% of base amount
+   - payment_processing_fee: 2.9% + $0.30
+   - total_amount: base + processing fee
    - auto_release_eligible_at: +48 hours
 ```
 
-### 5. Complete Work & Release Funds
+### 5. Complete Work & Upload Photos (Provider Bots)
 - **Evidence Photos:** 2 photos uploaded from Unsplash
-- **Work Status:** Marked as "done"
-- **Fund Release:** Auto-release after 48 hours
-- **Final Status:** "completed"
+- **Work Status:** Marked as "awaiting_fund_release"
+- **Provider Behavior:** Upload photos and request payment
+
+### 6. Fund Release (Client Bots - REALISTIC BEHAVIOR)
+- **30% chance:** Client releases funds immediately
+- **70% chance:** Client ghosts (tests auto-release after 48 hours)
+- **Auto-Release:** Funds automatically released after 48 hours if client doesn't respond
 
 ## 🎯 Bot Payment Integration
 
@@ -67,7 +71,7 @@ Handles automated Stripe payments for bot contracts.
 - ✅ Verifies bot contract ownership
 - ✅ Uses Stripe test card (no real money)
 - ✅ Calculates platform + processing fees
-- ✅ Creates Payment Intent with automatic capture
+- ✅ Creates Payment Intent with manual capture (for escrow)
 - ✅ Updates contract with payment details
 - ✅ Sets 48-hour auto-release timer
 
@@ -83,7 +87,7 @@ Deployed Edge Function for cron job integration.
 
 **Endpoint:** 
 ```
-https://{project-ref}.supabase.co/functions/v1/bot-make-payment
+https://tjgxkzhrkajebpnvhekw.supabase.co/functions/v1/bot-make-payment
 ```
 
 **Usage:**
@@ -94,9 +98,10 @@ curl -X POST {function-url} \
   -d '{"contractId": "contract-id-here"}'
 ```
 
-## 📊 Monitoring Dashboard
+## 📊 Monitoring Dashboards
 
-Access: `/muna/bot-lab`
+### 1. Bot Lab Dashboard
+**Access:** `/muna/bot-lab`
 
 **Features:**
 - ✅ Real-time automation status (Active/Inactive)
@@ -108,6 +113,24 @@ Access: `/muna/bot-lab`
   - Run manual cycle
   - Test payment system
   - Kill switch (delete all bots)
+
+### 2. Contract Monitoring Dashboard (NEW!)
+**Access:** `/muna/contracts-monitor`
+
+**Features:**
+- ✅ View ALL contracts with status and payment details
+- ✅ See client-provider chat messages for each contract
+- ✅ Monitor for bypass attempts (off-platform payment arrangements)
+- ✅ Filter by status: Active, Awaiting Release, Completed, Disputed
+- ✅ Payment breakdown: Base amount, platform fee, processing fee, total
+- ✅ Timeline: Contract created → Work done → Funds released
+- ✅ Click any contract to see full details including all chat messages
+
+**Anti-Bypass Protection:**
+- All messages between clients and providers are logged
+- Dashboard shows warning if messages exist (potential bypass attempt)
+- Platform owner can review all communications
+- Any arrangements to pay outside the platform are flagged
 
 ## 🔧 Manual Testing
 
@@ -127,6 +150,15 @@ Access: `/muna/bot-lab`
    - Contracts created
    - Payments processed
 
+### Monitor Contracts
+1. Navigate to `/muna/contracts-monitor`
+2. View all contracts with:
+   - Status and payment information
+   - Client and provider details
+   - Chat messages (detect bypass attempts)
+   - Payment breakdown
+3. Click any contract card to see full details
+
 ## 📈 Expected Activity (Per 5-Minute Cycle)
 
 Assuming 50 bots (25 clients, 25 providers):
@@ -136,11 +168,12 @@ Assuming 50 bots (25 clients, 25 providers):
 **Contracts:** 1-10 new contracts
 **Payments:** 1-5 completed payments
 **Work Completion:** 1-3 contracts marked done
+**Fund Releases:** 30% immediate, 70% after 48h auto-release
 
 ## 🚨 Troubleshooting
 
 ### Bot Payments Not Working
-1. Check Stripe API keys in `.env.local`
+1. Check Stripe API keys in Edge Function secrets
 2. Verify webhook endpoint is configured
 3. Check Edge Function logs for errors
 4. Ensure `bot_payments_enabled` setting is `true`
@@ -156,14 +189,16 @@ WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'bot-automation-cycle'
 ORDER BY start_time DESC 
 LIMIT 10;
 
--- Manually trigger
-SELECT cron.schedule('bot-automation-cycle', '*/5 * * * *', 
-  $$SELECT net.http_post(...) AS request_id$$);
+-- Manually trigger (if needed)
+SELECT net.http_post(
+  url:='https://tjgxkzhrkajebpnvhekw.supabase.co/functions/v1/hourly-bot-cycle',
+  headers:='{"Content-Type": "application/json", "Authorization": "Bearer {anon-key}"}'::jsonb
+) AS request_id;
 ```
 
 ### Payment Errors
 Common issues:
-- Invalid Stripe keys
+- Invalid Stripe keys in Edge Function secrets
 - Test card declined (use 4242 4242 4242 4242)
 - Webhook secret mismatch
 - Contract already paid
@@ -174,12 +209,14 @@ Common issues:
 - **Bot Verification:** Only contracts owned by bot_accounts can use automated payment
 - **No Real Money:** Test card 4242 4242 4242 4242 never charges real funds
 - **Webhook Validation:** Stripe signatures verified on webhook endpoint
+- **Anti-Bypass Monitoring:** All chat messages logged and reviewable by platform owner
 
 ## 📝 Database Schema
 
 ### Key Tables
 - `bot_accounts` - Bot profile tracking
 - `contracts` - Contract with payment_status field
+- `contract_messages` - Chat messages between clients and providers
 - `evidence_photos` - Work completion photos
 - `platform_settings` - Automation toggles
 
@@ -203,9 +240,11 @@ WHERE setting_key = 'bot_payments_enabled';
 - [x] Stripe integration configured with test keys
 - [x] Webhook endpoint receiving events
 - [x] Payment flow tested and working
-- [x] Bot-lab dashboard accessible
+- [x] Bot-lab dashboard accessible at `/muna/bot-lab`
+- [x] Contract monitoring dashboard accessible at `/muna/contracts-monitor`
 - [x] Error logging and monitoring active
-- [x] Auto-release scheduler configured
+- [x] Auto-release scheduler configured (48 hours)
+- [x] Anti-bypass monitoring enabled (all messages logged)
 
 ## 🎉 Success Criteria
 
@@ -215,11 +254,29 @@ The system is working correctly when:
 3. ✅ Contracts created with "active" status
 4. ✅ Payments processed (status changes to "held")
 5. ✅ Work marked complete with photos
-6. ✅ Funds auto-released after 48 hours
+6. ✅ 30% of funds released immediately, 70% after 48h auto-release
 7. ✅ No errors in bot-lab dashboard
+8. ✅ All chat messages visible in contracts-monitor dashboard
+
+## 🛡️ Anti-Bypass Protection
+
+**How to Monitor:**
+1. Go to `/muna/contracts-monitor`
+2. Click any contract with chat messages
+3. Review all messages between client and provider
+4. Look for keywords indicating off-platform payment:
+   - "cash", "direct payment", "pay outside", "bypass", "directly"
+   - Phone numbers, email addresses, external payment links
+   - Any mention of avoiding platform fees
+
+**If Bypass Detected:**
+- Flag the contract in the dashboard
+- Contact both parties
+- Apply platform penalties as per Terms of Service
+- All messages are timestamped and attributed to specific users
 
 ---
 
 **Last Updated:** 2026-04-25  
 **Status:** ✅ OPERATIONAL  
-**Next Review:** Check dashboard daily for anomalies
+**Next Review:** Check both dashboards daily for anomalies and bypass attempts
