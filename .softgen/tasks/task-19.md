@@ -27,6 +27,11 @@ This prevents automatic releases without client approval, providing maximum safe
 - All release methods tracked (client_approval, admin_release)
 - Bot clients auto-approve for seamless testing
 
+**Owner Login Fix:**
+- Fixed admin authentication (removed database dependency)
+- Hardcoded owner emails for permanent access
+- Added `/muna/change-password` feature
+
 ## Checklist
 
 - [x] Add database columns (payment_status, client_approval_deadline, auto_release_eligible_at, payment_captured_at, escrow_released_method, escrow_needs_review)
@@ -42,6 +47,8 @@ This prevents automatic releases without client approval, providing maximum safe
 - [x] Create comprehensive testing guide
 - [x] Add Escrow Management link to Control Centre
 - [x] Update all Stripe API versions to 2025-02-24.acacia
+- [x] Fix owner login (remove database dependency, hardcode email check)
+- [x] Create password change feature (/muna/change-password)
 
 ## Acceptance
 
@@ -50,3 +57,5 @@ This prevents automatic releases without client approval, providing maximum safe
 - Admin can review and manually approve payments in Escrow Management dashboard
 - All three release methods (client_approval, admin_release) are tracked in database
 - Bot clients automatically approve payments for seamless testing
+- Owner can always login with bluetikanz@gmail.com or sam@bluetika.co.nz
+- Owner can change password via /muna/change-password
