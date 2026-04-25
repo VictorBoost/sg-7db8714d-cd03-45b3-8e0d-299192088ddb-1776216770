@@ -10,38 +10,39 @@ The authentication logic was trying to query a non-existent database column inst
 
 ## Permanent Fix Applied
 
-### 1. Email-Based Admin Detection ✅
+### 1. Email-Based Owner Detection ✅
 
 **File**: `src/pages/api/auth/muna-login.ts`
 
 ```typescript
-// Check if email matches admin pattern (@bluetika.co.nz)
-const isAdmin = email.toLowerCase().endsWith("@bluetika.co.nz");
-const isOwner = email.toLowerCase() === "bluetikanz@gmail.com" || email.toLowerCase() === "sam@bluetika.co.nz";
+// CRITICAL: Only bluetikanz@gmail.com is owner
+// DO NOT CHANGE THIS - Only owner can add emails from /muna settings
+const isOwner = email.toLowerCase() === "bluetikanz@gmail.com";
 
-if (!isAdmin && !isOwner) {
+if (!isOwner) {
   await supabase.auth.signOut();
-  return res.status(403).json({ error: "Access denied. Admin privileges required." });
+  return res.status(403).json({ error: "Access denied. Owner privileges required." });
 }
 ```
 
 ### 2. Owner Email Hardcoded ✅
 
-**Protected Owner Emails:**
-- `bluetikanz@gmail.com`
-- `sam@bluetika.co.nz`
+**Protected Owner Email:**
+- `bluetikanz@gmail.com` ONLY
 
-These emails will **always** have owner access, regardless of database state.
+This email will **always** have owner access, regardless of database state.
 
-### 3. Admin Pattern Matching ✅
+### 3. No Admin Pattern ✅
 
-Any email ending with `@bluetika.co.nz` is automatically granted admin access (staff level).
+**@bluetika.co.nz emails DO NOT have admin access.**
+
+Only the owner can add additional admin emails from inside `/muna` settings in the future.
 
 ### 4. No Database Dependency ✅
 
 Authentication now relies on:
 - Supabase Auth (password verification)
-- Email pattern matching (hardcoded in code)
+- Email exact match (hardcoded in code)
 - **NOT** dependent on any database column
 
 ## Password Change Feature
@@ -58,7 +59,7 @@ Authentication now relies on:
 
 ### Security
 - Requires active session
-- Verifies admin/owner access
+- Verifies owner access
 - Validates password strength
 - Confirms password match
 
@@ -66,58 +67,61 @@ Authentication now relies on:
 
 1. **Login**: User enters email + password
 2. **Supabase Auth**: Verifies credentials
-3. **Email Check**: Hardcoded pattern matching
-4. **Access Grant**: If owner/admin email → access granted
+3. **Email Check**: Exact match to `bluetikanz@gmail.com`
+4. **Access Grant**: If match → access granted
 5. **Session**: HTTP-only cookie set for /muna paths
 
 ## Testing Owner Login
 
 1. Go to `/muna/login`
-2. Enter: `bluetikanz@gmail.com` or `sam@bluetika.co.nz`
+2. Enter: `bluetikanz@gmail.com`
 3. Enter correct password
 4. ✅ Should login successfully
 5. ✅ Should see "Owner" role in dashboard
 
 ## Critical Notes
 
-⚠️ **DO NOT CHANGE**:
+⚠️ **DO NOT CHANGE** (PERMANENT - AI must never modify):
 - Owner email hardcoding in `muna-login.ts`
-- Email pattern matching logic
-- Admin access check logic
+- Email exact match logic (`bluetikanz@gmail.com`)
+- Owner access check logic
+
+⚠️ **NO ADMIN PATTERN**:
+- `@bluetika.co.nz` emails do NOT have admin access
+- Only owner can add additional admins from `/muna` settings
 
 ✅ **Safe to Change**:
 - Password (via `/muna/change-password`)
 - Session timeout (currently 1 hour)
-- Email alert recipients
+- Email alert recipient
 
 ## Future Proofing
 
 If database schema changes or RLS policies are modified:
 - Owner login will **still work** (hardcoded email check)
-- Admin login will **still work** (email pattern matching)
 - No database columns required for access control
 
 ## Emergency Access
 
 If locked out:
-1. Use Supabase dashboard to reset password
+1. Use Supabase dashboard to reset password for `bluetikanz@gmail.com`
 2. Owner email check will still grant access
-3. No database changes needed
+3. No code changes needed
 
 ## Maintenance
 
-When adding new admin users:
-1. Create account with `@bluetika.co.nz` email
-2. Access automatically granted
-3. No code changes needed
+**Adding New Admin Users:**
+- Only the owner can add from `/muna` settings
+- AI should NEVER add admin emails to the code
+- Future feature: admin management interface
 
-When removing admin users:
-1. Delete Supabase Auth account
-2. Access automatically revoked
-3. No code changes needed
+**Removing Access:**
+- Delete Supabase Auth account
+- Access automatically revoked
 
 ## Change Log
 
 - **2026-04-25**: Fixed owner login (removed database dependency)
 - **2026-04-25**: Added `/muna/change-password` feature
-- **2026-04-25**: Hardcoded owner emails for permanent access
+- **2026-04-25**: Hardcoded ONLY `bluetikanz@gmail.com` as owner
+- **2026-04-25**: Removed @bluetika.co.nz admin pattern (owner only)

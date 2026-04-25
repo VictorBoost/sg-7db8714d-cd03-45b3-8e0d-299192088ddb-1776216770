@@ -16,16 +16,16 @@ export default async function handler(
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error || !data.user) {
-      return res.status(401).json({ error: "Invalid admin credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Check if email matches admin pattern (@bluetika.co.nz)
-    const isAdmin = email.toLowerCase().endsWith("@bluetika.co.nz");
-    const isOwner = email.toLowerCase() === "bluetikanz@gmail.com" || email.toLowerCase() === "sam@bluetika.co.nz";
+    // CRITICAL: Only bluetikanz@gmail.com is owner
+    // DO NOT CHANGE THIS - Only owner can add emails from /muna settings
+    const isOwner = email.toLowerCase() === "bluetikanz@gmail.com";
 
-    if (!isAdmin && !isOwner) {
+    if (!isOwner) {
       await supabase.auth.signOut();
-      return res.status(403).json({ error: "Access denied. Admin privileges required." });
+      return res.status(403).json({ error: "Access denied. Owner privileges required." });
     }
 
     // Get profile name for logging
@@ -35,12 +35,12 @@ export default async function handler(
       .eq("id", data.user.id)
       .single();
 
-    // Send admin login alert
+    // Send owner login alert
     await sesEmailService.sendEmail({
-      to: "sam@bluetika.co.nz",
-      subject: "BlueTika Admin Login Alert",
+      to: "bluetikanz@gmail.com",
+      subject: "BlueTika Owner Login Alert",
       htmlBody: `
-        <h2>Admin Login Detected</h2>
+        <h2>Owner Login Detected</h2>
         <p><strong>User:</strong> ${profile?.full_name || "Unknown"} (${email})</p>
         <p><strong>Time:</strong> ${new Date().toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}</p>
         <p><strong>IP:</strong> ${req.headers["x-forwarded-for"] || req.socket.remoteAddress || "Unknown"}</p>
@@ -55,9 +55,8 @@ export default async function handler(
     res.status(200).json({ 
       user: data.user, 
       session: data.session, 
-      isAdmin: true,
-      isOwner,
-      role: isOwner ? "owner" : "admin"
+      isOwner: true,
+      role: "owner"
     });
   } catch (error: any) {
     res.status(500).json({ error: "Authentication failed." });

@@ -33,11 +33,11 @@ export default function ChangePassword() {
         return;
       }
 
-      // Verify admin access
-      const isAdmin = user.email?.toLowerCase().endsWith("@bluetika.co.nz");
-      const isOwner = user.email?.toLowerCase() === "bluetikanz@gmail.com" || user.email?.toLowerCase() === "sam@bluetika.co.nz";
+      // CRITICAL: Only bluetikanz@gmail.com is owner
+      // DO NOT CHANGE THIS - Only owner can add emails from /muna settings
+      const isOwner = user.email?.toLowerCase() === "bluetikanz@gmail.com";
 
-      if (!isAdmin && !isOwner) {
+      if (!isOwner) {
         router.push("/");
         return;
       }
