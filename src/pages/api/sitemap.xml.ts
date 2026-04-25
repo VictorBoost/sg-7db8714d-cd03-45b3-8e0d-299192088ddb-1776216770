@@ -1,11 +1,25 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * Dynamic sitemap.xml generator
+ * Automatically indexes all projects, categories, and static pages
+ * 
+ * Search engines are pinged via /api/ping-sitemap when new projects are created
+ * Sitemap updates every hour or when manually pinged
+ */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   try {
+    // Set proper headers for XML sitemap
+    res.setHeader("Content-Type", "text/xml");
+    res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=7200");
+
+    const baseUrl = "https://bluetika.co.nz";
+    const today = new Date().toISOString().split("T")[0];
+
     // Fetch all active projects with their last modified dates
     const { data: projects, error } = await supabase
       .from("projects")
@@ -16,9 +30,6 @@ export default async function handler(
     if (error) {
       console.error("Error fetching projects for sitemap:", error);
     }
-
-    const baseUrl = "https://bluetika.co.nz";
-    const currentDate = new Date().toISOString();
 
     // Static pages with priority
     const staticPages = [
@@ -55,7 +66,7 @@ export default async function handler(
     staticPages.forEach((page) => {
       sitemap += "  <url>\n";
       sitemap += `    <loc>${baseUrl}${page.url}</loc>\n`;
-      sitemap += `    <lastmod>${currentDate}</lastmod>\n`;
+      sitemap += `    <lastmod>${today}</lastmod>\n`;
       sitemap += `    <changefreq>${page.changefreq}</changefreq>\n`;
       sitemap += `    <priority>${page.priority}</priority>\n`;
       sitemap += "  </url>\n";
@@ -65,7 +76,7 @@ export default async function handler(
     categories.forEach((category) => {
       sitemap += "  <url>\n";
       sitemap += `    <loc>${baseUrl}/categories/${category}</loc>\n`;
-      sitemap += `    <lastmod>${currentDate}</lastmod>\n`;
+      sitemap += `    <lastmod>${today}</lastmod>\n`;
       sitemap += `    <changefreq>weekly</changefreq>\n`;
       sitemap += `    <priority>0.9</priority>\n`;
       sitemap += "  </url>\n";
