@@ -52,6 +52,11 @@ const DOCUMENT_REQUIREMENTS = {
   },
 };
 
+// Auto-approve threshold - all documents above this confidence are automatically approved
+const AUTO_APPROVE_CONFIDENCE = 0.75;
+
+// All document types can now be auto-approved if confidence is high enough
+
 export const aiVerificationService = {
   /**
    * Scan document using AI vision analysis
