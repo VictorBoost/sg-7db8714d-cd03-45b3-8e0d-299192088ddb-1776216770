@@ -234,103 +234,200 @@ export const botLabService = {
   },
 
   async removeBots(count: number = 50) {
-    const { data: bots, error } = await supabase
-      .from("bot_accounts")
-      .select("id, profile_id")
-      .eq("is_active", true)
-      .limit(count);
+    try {
+      // Get oldest bots first
+      const { data: bots, error: fetchError } = await supabase
+        .from("bot_accounts")
+        .select("id, profile_id")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(count);
 
-    if (error || !bots) {
-      return { success: 0, failed: count, errors: [error?.message || "Failed to fetch bots"] };
-    }
-
-    const results = {
-      success: 0,
-      failed: 0,
-      errors: [] as string[]
-    };
-
-    for (const bot of bots) {
-      try {
-        // Delete bot account (cascades to profile which cascades to all content)
-        const { error: deleteError } = await supabase
-          .from("bot_accounts")
-          .delete()
-          .eq("id", bot.id);
-
-        if (deleteError) {
-          results.failed++;
-          results.errors.push(`Bot ${bot.id}: ${deleteError.message}`);
-        } else {
-          results.success++;
-        }
-      } catch (error) {
-        results.failed++;
-        results.errors.push(`Bot ${bot.id}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      if (fetchError) {
+        console.error("Fetch bots error:", fetchError);
+        return { success: 0, failed: count, errors: [fetchError.message] };
       }
-    }
 
-    return results;
+      if (!bots || bots.length === 0) {
+        return { success: 0, failed: 0, errors: ["No bots to remove"] };
+      }
+
+      const profileIds = bots.map(b => b.profile_id);
+      const results = { success: 0, failed: 0, errors: [] as string[] };
+
+      // Delete all related data for these bots
+      try {
+        // 1. Get contract IDs to delete child records
+        const { data: contracts } = await supabase
+          .from("contracts")
+          .select("id")
+          .or(`client_id.in.(${profileIds.join(',')}),provider_id.in.(${profileIds.join(',')})`);
+
+        const contractIds = contracts?.map(c => c.id) || [];
+
+        // 2. Delete contract-related data
+        if (contractIds.length > 0) {
+          await supabase.from("evidence_photos").delete().in("contract_id", contractIds);
+          await supabase.from("contract_messages").delete().in("contract_id", contractIds);
+          await supabase.from("reviews").delete().in("contract_id", contractIds);
+        }
+
+        // 3. Delete reviews by bot IDs
+        await supabase.from("reviews").delete().in("reviewer_id", profileIds);
+        await supabase.from("reviews").delete().in("reviewee_id", profileIds);
+
+        // 4. Delete contracts
+        await supabase.from("contracts").delete().in("client_id", profileIds);
+        await supabase.from("contracts").delete().in("provider_id", profileIds);
+
+        // 5. Delete bids
+        await supabase.from("bids").delete().in("provider_id", profileIds);
+
+        // 6. Get project IDs
+        const { data: projects } = await supabase
+          .from("projects")
+          .select("id")
+          .in("client_id", profileIds);
+
+        const projectIds = projects?.map(p => p.id) || [];
+
+        // 7. Delete project bids
+        if (projectIds.length > 0) {
+          await supabase.from("bids").delete().in("project_id", projectIds);
+        }
+
+        // 8. Delete projects
+        await supabase.from("projects").delete().in("client_id", profileIds);
+
+        // 9. Delete bot activity logs
+        await supabase.from("bot_activity_logs").delete().in("bot_id", profileIds);
+
+        // 10. Delete bot bypass attempts
+        await supabase.from("bot_bypass_attempts").delete().in("bot_profile_id", profileIds);
+
+        // 11. Delete bot accounts
+        await supabase.from("bot_accounts").delete().in("profile_id", profileIds);
+
+        // 12. Delete profiles
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .delete()
+          .in("id", profileIds);
+
+        if (profileError) {
+          console.error("Profile deletion error:", profileError);
+          results.failed = bots.length;
+          results.errors.push(profileError.message);
+        } else {
+          results.success = bots.length;
+        }
+      } catch (error: any) {
+        console.error("Cascade deletion error:", error);
+        results.failed = bots.length;
+        results.errors.push(error.message);
+      }
+
+      return results;
+    } catch (error: any) {
+      console.error("removeBots error:", error);
+      return { success: 0, failed: count, errors: [error.message] };
+    }
   },
 
   async killSwitch() {
     try {
+      console.log("🚨 Kill switch initiated...");
+      
       // Disable automation first
       await this.toggleAutomation(false);
       await this.toggleBotPayments(false);
+      console.log("✅ Automation disabled");
 
-      // Get bot profile IDs
+      // Get all bot profile IDs
       const { data: botProfiles } = await supabase
         .from("bot_accounts")
         .select("profile_id");
 
       const profileIds = botProfiles?.map(b => b.profile_id) || [];
+      
       if (profileIds.length === 0) {
+        console.log("ℹ️ No bots to delete");
         return { success: true, deleted: 0 };
       }
 
-      // Delete in proper order to avoid FK violations
-      // 1. Reviews (references contracts + profiles)
-      await (supabase as any).from("reviews").delete().in("reviewer_id", profileIds);
-      await (supabase as any).from("reviews").delete().in("reviewee_id", profileIds);
+      console.log(`📊 Found ${profileIds.length} bots to delete`);
 
-      // 2. Evidence photos (references contracts)
-      const { data: contracts } = await (supabase as any)
+      // Delete in proper cascade order
+      console.log("🗑️ Step 1: Deleting contract-related data...");
+      const { data: allContracts } = await supabase
         .from("contracts")
         .select("id")
-        .in("client_id", profileIds);
-      
-      if (contracts && contracts.length > 0) {
-        const contractIds = contracts.map((c: any) => c.id);
-        await (supabase as any).from("evidence_photos").delete().in("contract_id", contractIds);
-        await (supabase as any).from("contract_messages").delete().in("contract_id", contractIds);
+        .or(`client_id.in.(${profileIds.join(',')}),provider_id.in.(${profileIds.join(',')})`);
+
+      const contractIds = allContracts?.map(c => c.id) || [];
+      console.log(`   Found ${contractIds.length} contracts`);
+
+      if (contractIds.length > 0) {
+        await supabase.from("evidence_photos").delete().in("contract_id", contractIds);
+        await supabase.from("contract_messages").delete().in("contract_id", contractIds);
+        await supabase.from("reviews").delete().in("contract_id", contractIds);
+        console.log("   ✅ Contract children deleted");
       }
 
-      // 3. Contracts
-      await (supabase as any).from("contracts").delete().in("client_id", profileIds);
-      await (supabase as any).from("contracts").delete().in("provider_id", profileIds);
+      console.log("🗑️ Step 2: Deleting reviews...");
+      await supabase.from("reviews").delete().in("reviewer_id", profileIds);
+      await supabase.from("reviews").delete().in("reviewee_id", profileIds);
+      console.log("   ✅ Reviews deleted");
 
-      // 4. Bids (references projects + profiles)
-      await (supabase as any).from("bids").delete().in("provider_id", profileIds);
+      console.log("🗑️ Step 3: Deleting contracts...");
+      await supabase.from("contracts").delete().in("client_id", profileIds);
+      await supabase.from("contracts").delete().in("provider_id", profileIds);
+      console.log("   ✅ Contracts deleted");
 
-      // 5. Projects
-      await (supabase as any).from("projects").delete().in("client_id", profileIds);
+      console.log("🗑️ Step 4: Deleting bids...");
+      await supabase.from("bids").delete().in("provider_id", profileIds);
+      
+      const { data: allProjects } = await supabase
+        .from("projects")
+        .select("id")
+        .in("client_id", profileIds);
 
-      // 6. Bot activity logs
-      await (supabase as any).from("bot_activity_logs").delete().in("bot_id", profileIds);
+      const projectIds = allProjects?.map(p => p.id) || [];
+      if (projectIds.length > 0) {
+        await supabase.from("bids").delete().in("project_id", projectIds);
+      }
+      console.log("   ✅ Bids deleted");
 
-      // 7. Bot bypass attempts
-      await (supabase as any).from("bot_bypass_attempts").delete().in("bot_profile_id", profileIds);
+      console.log("🗑️ Step 5: Deleting projects...");
+      await supabase.from("projects").delete().in("client_id", profileIds);
+      console.log("   ✅ Projects deleted");
 
-      // 8. Bot accounts
-      await (supabase as any).from("bot_accounts").delete().in("profile_id", profileIds);
+      console.log("🗑️ Step 6: Deleting bot metadata...");
+      await supabase.from("bot_activity_logs").delete().in("bot_id", profileIds);
+      await supabase.from("bot_bypass_attempts").delete().in("bot_profile_id", profileIds);
+      console.log("   ✅ Bot metadata deleted");
 
-      // 9. Profiles (last)
-      await (supabase as any).from("profiles").delete().in("id", profileIds);
+      console.log("🗑️ Step 7: Deleting bot accounts...");
+      await supabase.from("bot_accounts").delete().in("profile_id", profileIds);
+      console.log("   ✅ Bot accounts deleted");
+
+      console.log("🗑️ Step 8: Deleting profiles...");
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .in("id", profileIds);
+
+      if (profileError) {
+        console.error("❌ Profile deletion failed:", profileError);
+        throw profileError;
+      }
+
+      console.log("   ✅ Profiles deleted");
+      console.log(`✅ Kill switch complete! Deleted ${profileIds.length} bots`);
 
       return { success: true, deleted: profileIds.length };
     } catch (error: any) {
-      console.error("Kill switch error:", error);
+      console.error("❌ Kill switch error:", error);
       return { success: false, error: error.message, deleted: 0 };
     }
   },
