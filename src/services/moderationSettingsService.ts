@@ -86,22 +86,25 @@ export async function updateModerationSetting(
     };
   }
 
-  // Create payload dynamically but cast to any to bypass strict type checking for dynamic keys
-  const updatePayload: any = {
+  // Map content type to column name
+  const columnName = `${contentType}_auto`;
+  
+  // Build update object with correct column
+  const updateData: Record<string, any> = {
     updated_at: new Date().toISOString(),
   };
-  updatePayload[`${contentType}_auto`] = autoApprove;
+  updateData[columnName] = autoApprove;
   
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("moderation_settings")
-    .update(updatePayload)
+    .update(updateData)
     .eq("id", "00000000-0000-0000-0000-000000000000");
 
-  console.log("Update moderation setting:", { contentType, autoApprove, error });
+  console.log("✅ Update moderation setting:", { contentType, columnName, autoApprove, error });
 
   if (error) {
-    console.error("Failed to update moderation setting:", error);
-    return { success: false, error: "Failed to update setting" };
+    console.error("❌ Failed to update moderation setting:", error);
+    return { success: false, error: error.message || "Failed to update setting" };
   }
 
   return { success: true };
