@@ -908,8 +908,28 @@ export default function ControlCentre() {
                         >
                           MonaLisa Logs
                         </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => router.push("/muna/test-email")}
+                          className="border-primary"
+                        >
+                          Test Email
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => router.push("/muna/test-cycle")}
+                          className="border-primary"
+                        >
+                          Test Full Cycle
+                        </Button>
                       </>
                     )}
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push("/muna/user-management")}
+                    >
+                      User Management
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

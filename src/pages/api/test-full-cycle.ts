@@ -14,12 +14,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { clientEmail, providerEmail } = req.body;
 
   if (!clientEmail || !providerEmail) {
-    return res.status(400).json({ error: "clientEmail and providerEmail required" });
+    return res.status(400).json({ error: "Both clientEmail and providerEmail are required" });
   }
 
-  try {
-    console.log(`🧪 Starting full cycle test with:\nClient: ${clientEmail}\nProvider: ${providerEmail}`);
+  console.log("🧪 Starting full cycle test...");
+  console.log("   Client:", clientEmail);
+  console.log("   Provider:", providerEmail);
 
+  try {
     // Step 1: Get or create profiles
     let { data: clientProfile } = await supabase
       .from("profiles")
@@ -185,6 +187,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       review_type: "provider_to_client"
     });
     console.log("✅ Provider submitted review of client (5 stars)");
+    
+    // Send review notification email to client
+    console.log("   📧 Sending review notification to client...");
+    try {
+      await sesEmailService.sendEmail({
+        to: clientEmail,
+        subject: "BlueTika: Provider Reviewed You! ⭐",
+        htmlBody: `<h2>Review Received</h2><p>Your provider rated you 5 stars and said: "${providerReview.comment}"</p>`
+      });
+      console.log("   ✅ Client review notification email sent");
+    } catch (emailErr) {
+      console.warn("   ⚠️ Client review email failed:", emailErr);
+    }
 
     // Step 8: Client releases funds and reviews provider
     await supabase.from("contracts").update({
@@ -202,6 +217,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       review_type: "client_to_provider"
     });
     console.log("✅ Client released funds and reviewed provider (5 stars)");
+
+    console.log("   ✅ Funds released to provider");
+
+    // Send fund release emails
+    console.log("   📧 Sending fund release notifications...");
+    try {
+      await sesEmailService.sendFundReleaseNotification(
+        providerEmail,
+        `${provider.first_name} ${provider.last_name}`,
+        "provider",
+        project.title,
+        finalAmount,
+        0,
+        finalAmount,
+        baseUrl
+      );
+      console.log("   ✅ Provider fund release email sent");
+
+      await sesEmailService.sendFundReleaseNotification(
+        clientEmail,
+        `${client.first_name} ${client.last_name}`,
+        "client",
+        project.title,
+        finalAmount,
+        0,
+        finalAmount,
+        baseUrl
+      );
+      console.log("   ✅ Client fund release email sent");
+    } catch (emailErr) {
+      console.warn("   ⚠️ Fund release emails failed:", emailErr);
+    }
 
     return res.status(200).json({
       success: true,
