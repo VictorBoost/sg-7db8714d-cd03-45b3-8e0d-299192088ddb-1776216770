@@ -373,51 +373,51 @@ export const botLabService = {
       console.log(`   Found ${contractIds.length} contracts`);
 
       if (contractIds.length > 0) {
-        await supabase.from("evidence_photos").delete().in("contract_id", contractIds);
-        await supabase.from("contract_messages").delete().in("contract_id", contractIds);
-        await supabase.from("reviews").delete().in("contract_id", contractIds);
+        await (supabase as any).from("evidence_photos").delete().in("contract_id", contractIds);
+        await (supabase as any).from("contract_messages").delete().in("contract_id", contractIds);
+        await (supabase as any).from("reviews").delete().in("contract_id", contractIds);
         console.log("   ✅ Contract children deleted");
       }
 
       console.log("🗑️ Step 2: Deleting reviews...");
-      await supabase.from("reviews").delete().in("reviewer_id", profileIds);
-      await supabase.from("reviews").delete().in("reviewee_id", profileIds);
+      await (supabase as any).from("reviews").delete().in("reviewer_id", profileIds);
+      await (supabase as any).from("reviews").delete().in("reviewee_id", profileIds);
       console.log("   ✅ Reviews deleted");
 
       console.log("🗑️ Step 3: Deleting contracts...");
-      await supabase.from("contracts").delete().in("client_id", profileIds);
-      await supabase.from("contracts").delete().in("provider_id", profileIds);
+      await (supabase as any).from("contracts").delete().in("client_id", profileIds);
+      await (supabase as any).from("contracts").delete().in("provider_id", profileIds);
       console.log("   ✅ Contracts deleted");
 
       console.log("🗑️ Step 4: Deleting bids...");
-      await supabase.from("bids").delete().in("provider_id", profileIds);
+      await (supabase as any).from("bids").delete().in("provider_id", profileIds);
       
       const { data: allProjects } = await supabase
         .from("projects")
         .select("id")
         .in("client_id", profileIds);
 
-      const projectIds = allProjects?.map(p => p.id) || [];
+      const projectIds = allProjects?.map((p: any) => p.id) || [];
       if (projectIds.length > 0) {
-        await supabase.from("bids").delete().in("project_id", projectIds);
+        await (supabase as any).from("bids").delete().in("project_id", projectIds);
       }
       console.log("   ✅ Bids deleted");
 
       console.log("🗑️ Step 5: Deleting projects...");
-      await supabase.from("projects").delete().in("client_id", profileIds);
+      await (supabase as any).from("projects").delete().in("client_id", profileIds);
       console.log("   ✅ Projects deleted");
 
       console.log("🗑️ Step 6: Deleting bot metadata...");
-      await supabase.from("bot_activity_logs").delete().in("bot_id", profileIds);
-      await supabase.from("bot_bypass_attempts").delete().in("bot_profile_id", profileIds);
+      await (supabase as any).from("bot_activity_logs").delete().in("bot_id", profileIds);
+      await (supabase as any).from("bot_bypass_attempts").delete().in("bot_profile_id", profileIds);
       console.log("   ✅ Bot metadata deleted");
 
       console.log("🗑️ Step 7: Deleting bot accounts...");
-      await supabase.from("bot_accounts").delete().in("profile_id", profileIds);
+      await (supabase as any).from("bot_accounts").delete().in("profile_id", profileIds);
       console.log("   ✅ Bot accounts deleted");
 
       console.log("🗑️ Step 8: Deleting profiles...");
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from("profiles")
         .delete()
         .in("id", profileIds);
