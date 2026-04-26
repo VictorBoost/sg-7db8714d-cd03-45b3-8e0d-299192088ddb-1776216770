@@ -279,7 +279,7 @@ export const botLabService = {
       await this.toggleAutomation(false);
       await this.toggleBotPayments(false);
 
-      // 1. Get bot profile IDs before deleting anything
+      // Get bot profile IDs
       const { data: botProfiles } = await supabase
         .from("bot_accounts")
         .select("profile_id");
@@ -289,56 +289,44 @@ export const botLabService = {
         return { success: true, deleted: 0 };
       }
 
-      // 2. Get associated contract IDs
-      const { data: botContracts } = await supabase
+      // Delete in proper order to avoid FK violations
+      // 1. Reviews (references contracts + profiles)
+      await supabase.from("reviews").delete().in("reviewer_id", profileIds);
+      await supabase.from("reviews").delete().in("reviewee_id", profileIds);
+
+      // 2. Evidence photos (references contracts)
+      const { data: contracts } = await supabase
         .from("contracts")
         .select("id")
         .in("client_id", profileIds);
       
-      const contractIds = botContracts?.map(c => c.id) || [];
-
-      // 3. Get associated project IDs
-      const { data: botProjects } = await supabase
-        .from("projects")
-        .select("id")
-        .in("client_id", profileIds);
-        
-      const projectIds = botProjects?.map(p => p.id) || [];
-
-      // 4. Delete child records using the IDs directly (cast as any to bypass deep type issues)
-      if (contractIds.length > 0) {
-        await (supabase as any).from("evidence_photos").delete().in("contract_id", contractIds);
-        await (supabase as any).from("contract_messages").delete().in("contract_id", contractIds);
-        await (supabase as any).from("reviews").delete().in("contract_id", contractIds);
-        await (supabase as any).from("contracts").delete().in("id", contractIds);
+      if (contracts && contracts.length > 0) {
+        const contractIds = contracts.map(c => c.id);
+        await supabase.from("evidence_photos").delete().in("contract_id", contractIds);
+        await supabase.from("contract_messages").delete().in("contract_id", contractIds);
       }
 
-      if (projectIds.length > 0) {
-        await (supabase as any).from("bids").delete().in("project_id", projectIds);
-        await (supabase as any).from("projects").delete().in("id", projectIds);
-      }
+      // 3. Contracts
+      await supabase.from("contracts").delete().in("client_id", profileIds);
+      await supabase.from("contracts").delete().in("provider_id", profileIds);
 
-      // 5. Delete bids from provider bots
-      await (supabase as any).from("bids").delete().in("provider_id", profileIds);
+      // 4. Bids (references projects + profiles)
+      await supabase.from("bids").delete().in("provider_id", profileIds);
+
+      // 5. Projects
+      await supabase.from("projects").delete().in("client_id", profileIds);
 
       // 6. Bot activity logs
-      await (supabase as any).from("bot_activity_logs").delete().in("bot_id", profileIds);
+      await supabase.from("bot_activity_logs").delete().in("bot_id", profileIds);
 
-      // 7. Delete bot_accounts
-      const { error: botAccountsError } = await supabase
-        .from("bot_accounts")
-        .delete()
-        .in("profile_id", profileIds);
+      // 7. Bot bypass attempts
+      await supabase.from("bot_bypass_attempts").delete().in("bot_profile_id", profileIds);
 
-      if (botAccountsError) throw botAccountsError;
+      // 8. Bot accounts
+      await supabase.from("bot_accounts").delete().in("profile_id", profileIds);
 
-      // 8. Delete profiles
-      const { error: profilesError } = await supabase
-        .from("profiles")
-        .delete()
-        .in("id", profileIds);
-
-      if (profilesError) throw profilesError;
+      // 9. Profiles (last)
+      await supabase.from("profiles").delete().in("id", profileIds);
 
       return { success: true, deleted: profileIds.length };
     } catch (error: any) {
@@ -348,6 +336,14 @@ export const botLabService = {
   },
 
   async getBotStats() {
+    // Get bot profile IDs first
+    const { data: botProfiles } = await supabase
+      .from("bot_accounts")
+      .select("profile_id")
+      .eq("is_active", true);
+
+    const botProfileIds = botProfiles?.map(b => b.profile_id) || [];
+
     // Get total bot counts
     const { count: totalBots } = await supabase
       .from("bot_accounts")
@@ -366,16 +362,38 @@ export const botLabService = {
       .eq("bot_type", "client")
       .eq("is_active", true);
 
-    // Get payment stats
+    // Get entity counts (only bot-created)
+    const { count: totalProjects } = await supabase
+      .from("projects")
+      .select("*", { count: "exact", head: true })
+      .in("client_id", botProfileIds);
+
+    const { count: totalBids } = await supabase
+      .from("bids")
+      .select("*", { count: "exact", head: true })
+      .in("provider_id", botProfileIds);
+
+    const { count: totalContracts } = await supabase
+      .from("contracts")
+      .select("*", { count: "exact", head: true })
+      .in("client_id", botProfileIds);
+
     const { count: paidContracts } = await supabase
       .from("contracts")
       .select("*", { count: "exact", head: true })
-      .in("payment_status", ["held", "released"]);
+      .in("payment_status", ["held", "released"])
+      .in("client_id", botProfileIds);
 
     const { count: completedContracts } = await supabase
       .from("contracts")
       .select("*", { count: "exact", head: true })
-      .eq("status", "completed");
+      .eq("status", "completed")
+      .in("client_id", botProfileIds);
+
+    const { count: totalReviews } = await supabase
+      .from("reviews")
+      .select("*", { count: "exact", head: true })
+      .in("reviewer_id", botProfileIds);
 
     // Get error logs
     const { data: errorLogs } = await supabase
@@ -396,8 +414,12 @@ export const botLabService = {
       totalBots: totalBots || 0,
       providerBots: providerBots || 0,
       clientBots: clientBots || 0,
+      totalProjects: totalProjects || 0,
+      totalBids: totalBids || 0,
+      totalContracts: totalContracts || 0,
       paidContracts: paidContracts || 0,
       completedContracts: completedContracts || 0,
+      totalReviews: totalReviews || 0,
       errorSummary,
       recentErrors: errorLogs?.filter(log => log.error_message).slice(0, 20) || []
     };

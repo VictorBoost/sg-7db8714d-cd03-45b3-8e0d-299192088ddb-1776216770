@@ -101,6 +101,19 @@ export default function BotLab() {
     await loadData();
   }
 
+  async function removeBots() {
+    if (!confirm("Remove 50 oldest bots and all their data?")) return;
+    
+    setLoading(true);
+    try {
+      const result = await botLabService.removeBots(50);
+      alert(`✅ Removed ${result.success} bots\n❌ Failed: ${result.failed}\n${result.errors.length > 0 ? "\nErrors:\n" + result.errors.slice(0, 5).join("\n") : ""}`);
+    } catch (error) {
+      alert(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+    await loadData();
+  }
+
   async function killSwitch() {
     if (!confirm("⚠️ WARNING: This will DELETE ALL BOTS and their data. Are you absolutely sure?")) return;
     if (!confirm("FINAL WARNING: This action CANNOT be undone. Continue?")) return;
@@ -132,6 +145,13 @@ export default function BotLab() {
               disabled={generatingBots}
             >
               {generatingBots ? "Generating..." : "Generate 50 Bots"}
+            </Button>
+            <Button
+              onClick={removeBots}
+              variant="outline"
+              disabled={loading}
+            >
+              Remove 50 Bots
             </Button>
             <Button
               onClick={toggleAutomation}
@@ -176,8 +196,24 @@ export default function BotLab() {
                 <div className="text-2xl font-bold text-teal-400">{stats?.providerBots || 0}</div>
               </div>
               <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Active Projects</div>
+                <div className="text-2xl font-bold text-purple-400">{stats?.totalProjects || 0}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Total Bids</div>
+                <div className="text-2xl font-bold text-orange-400">{stats?.totalBids || 0}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Active Contracts</div>
+                <div className="text-2xl font-bold text-yellow-400">{stats?.totalContracts || 0}</div>
+              </div>
+              <div className="space-y-1">
                 <div className="text-sm text-muted-foreground">Paid Contracts</div>
                 <div className="text-2xl font-bold text-green-400">{stats?.paidContracts || 0}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">Reviews Submitted</div>
+                <div className="text-2xl font-bold text-pink-400">{stats?.totalReviews || 0}</div>
               </div>
             </div>
 
