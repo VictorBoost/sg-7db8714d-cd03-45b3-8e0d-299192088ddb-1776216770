@@ -4,7 +4,7 @@
  */
 
 const SES_API_ENDPOINT = process.env.NEXT_PUBLIC_SES_ENDPOINT || "";
-const FROM_EMAIL = "noreply@bluetika.co.nz";
+const FROM_EMAIL = "support@bluetika.co.nz";
 
 export interface SendEmailParams {
   to: string;
@@ -108,7 +108,7 @@ export async function sendReviewReminder(recipientEmail: string, recipientName: 
 
 export async function sendAdminFundReleaseNotification(contractId: string, projectTitle: string, baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
-    to: "admin@bluetika.co.nz",
+    to: "support@bluetika.co.nz",
     subject: `BlueTika Admin: Funds Ready for Release - Contract ${contractId}`,
     htmlBody: baseHtml("✅ Reviews Completed", `<p>Contract ${contractId} is ready for fund release approval.</p>`, baseUrl)
   });
@@ -124,7 +124,7 @@ export async function sendFundReleaseNotification(recipientEmail: string, recipi
 
 export async function sendAdminDisputeNotification(contractId: string, projectTitle: string, raisedBy: string, raiserRole: "client" | "provider", baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
-    to: "admin@bluetika.co.nz",
+    to: "support@bluetika.co.nz",
     subject: `BlueTika Admin: Dispute Raised - Contract ${contractId}`,
     htmlBody: baseHtml("⚠️ Dispute Raised", `<p>A dispute has been raised by ${raisedBy} (${raiserRole}) for project ${projectTitle}.</p>`, baseUrl)
   });
@@ -188,7 +188,7 @@ export async function sendSessionReminderEmail(recipientEmail: string, recipient
 
 export async function sendAdminSuspensionAlert(userName: string, userEmail: string, attemptCount: number, suspensionType: "auto_suspended" | "permanently_banned", baseUrl: string = "https://bluetika.co.nz"): Promise<boolean> {
   return sendEmail({
-    to: "admin@bluetika.co.nz",
+    to: "support@bluetika.co.nz",
     subject: `BlueTika Admin: User ${suspensionType === "permanently_banned" ? "Permanently Banned" : "Auto-Suspended"}`,
     htmlBody: baseHtml("⚠️ Security Alert", `<p>User ${userName} (${userEmail}) has been ${suspensionType}.</p>`, baseUrl)
   });

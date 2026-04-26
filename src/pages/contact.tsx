@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Contact() {
@@ -19,23 +19,109 @@ export default function Contact() {
     subject: "",
     message: ""
   });
+  const [screenshots, setScreenshots] = useState<File[]>([]);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulate email sending (in production, this would call an API endpoint)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Upload screenshots to storage first if any
+      const screenshotUrls: string[] = [];
       
+      if (screenshots.length > 0) {
+        const { supabase } = await import("@/integrations/supabase/client");
+        
+        for (const file of screenshots) {
+          const fileName = `contact-${Date.now()}-${file.name}`;
+          const { data, error } = await supabase.storage
+            .from("evidence-photos")
+            .upload(fileName, file);
+
+          if (data) {
+            const { data: urlData } = supabase.storage
+              .from("evidence-photos")
+              .getPublicUrl(fileName);
+            screenshotUrls.push(urlData.publicUrl);
+          }
+        }
+      }
+
+      // Build email HTML
+      const screenshotHtml = screenshotUrls.length > 0 
+        ? `<div style="margin-top: 20px;"><strong>Screenshots:</strong><br/>${screenshotUrls.map(url => `<img src="${url}" style="max-width: 600px; margin: 10px 0;" />`).join('')}</div>`
+        : '';
+
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #1B4FD8; color: white; padding: 20px; text-align: center; }
+            .content { background: #f9f9f9; padding: 30px; }
+            .field { margin-bottom: 15px; }
+            .label { font-weight: bold; color: #1B4FD8; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Contact Form Submission</h1>
+              <p style="margin: 5px 0; background: #FEF3C7; color: #333; padding: 5px 10px; border-radius: 3px; display: inline-block;">From: bluetika.co.nz</p>
+            </div>
+            <div class="content">
+              <div class="field">
+                <div class="label">Name:</div>
+                <div>${formData.name}</div>
+              </div>
+              <div class="field">
+                <div class="label">Email:</div>
+                <div>${formData.email}</div>
+              </div>
+              <div class="field">
+                <div class="label">Subject:</div>
+                <div>${formData.subject}</div>
+              </div>
+              <div class="field">
+                <div class="label">Message:</div>
+                <div>${formData.message.replace(/\n/g, '<br/>')}</div>
+              </div>
+              ${screenshotHtml}
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Send email via SES
+      const response = await fetch(process.env.NEXT_PUBLIC_SES_ENDPOINT || "", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "support@bluetika.co.nz",
+          to: "support@bluetika.co.nz",
+          subject: `[Contact Form - bluetika.co.nz] ${formData.subject}`,
+          htmlBody: emailHtml,
+          textBody: `Name: ${formData.name}\nEmail: ${formData.email}\nSubject: ${formData.subject}\nMessage: ${formData.message}\n\nFrom: bluetika.co.nz`
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send email");
+      }
+
       toast({
         title: "Message sent!",
         description: "We'll get back to you within 24 hours.",
       });
       
       setFormData({ name: "", email: "", subject: "", message: "" });
+      setScreenshots([]);
     } catch (error) {
+      console.error("Contact form error:", error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
@@ -51,6 +137,17 @@ export default function Contact() {
       ...prev,
       [e.target.name]: e.target.value
     }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files).slice(0, 3 - screenshots.length);
+      setScreenshots(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeScreenshot = (index: number) => {
+    setScreenshots(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -114,8 +211,11 @@ export default function Contact() {
                       value={formData.subject}
                       onChange={handleChange}
                       required
-                      placeholder="How can we help?"
+                      placeholder="What is your enquiry about?"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      e.g., &quot;Bug Report&quot;, &quot;Payment Issue&quot;, &quot;Feature Request&quot;
+                    </p>
                   </div>
 
                   <div>
@@ -129,6 +229,47 @@ export default function Contact() {
                       rows={6}
                       placeholder="Tell us more about your inquiry..."
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="screenshots">Screenshots (Optional)</Label>
+                    <div className="mt-2">
+                      <label htmlFor="screenshots" className="cursor-pointer">
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 hover:border-primary transition-colors text-center">
+                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Click to upload screenshots (max 3)
+                          </p>
+                        </div>
+                      </label>
+                      <input
+                        id="screenshots"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleFileChange}
+                        className="hidden"
+                        disabled={screenshots.length >= 3}
+                      />
+                    </div>
+
+                    {screenshots.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {screenshots.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
+                            <span className="text-sm truncate flex-1">{file.name}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeScreenshot(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <Button 
