@@ -54,36 +54,31 @@ export const authService = {
     }
   },
 
-  async signUp(email: string, password: string, metadata?: any): Promise<{ user: AuthUser | null; session: Session | null; error: AuthError | null }> {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata,
-          emailRedirectTo: `${getURL()}auth/confirm-email`
-        }
+  async signUp(email: string, password: string, metadata: {
+    first_name: string;
+    last_name: string;
+    phone_number: string;
+    city_region: string;
+    is_client: boolean;
+    is_provider: boolean;
+  }) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata,
+        emailRedirectTo: undefined, // Disable email confirmation redirect
+      },
+    });
+
+    // Auto-confirm user by updating their email_confirmed_at
+    if (data.user && !error) {
+      await supabase.auth.updateUser({
+        email_confirmed_at: new Date().toISOString()
       });
-
-      if (error) {
-        return { user: null, session: null, error: { message: error.message, code: error.status?.toString() } };
-      }
-
-      const authUser = data.user ? {
-        id: data.user.id,
-        email: data.user.email || "",
-        user_metadata: data.user.user_metadata,
-        created_at: data.user.created_at
-      } : null;
-
-      return { user: authUser, session: data.session, error: null };
-    } catch (error) {
-      return { 
-        user: null, 
-        session: null,
-        error: { message: "An unexpected error occurred during sign up" } 
-      };
     }
+
+    return { user: data.user, session: data.session, error };
   },
 
   async signInWithPassword(email: string, password: string): Promise<{ user: AuthUser | null; error: AuthError | null }> {
