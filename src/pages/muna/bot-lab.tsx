@@ -111,6 +111,7 @@ export default function BotLab() {
     } catch (error) {
       alert(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
+    setLoading(false);
     await loadData();
   }
 
