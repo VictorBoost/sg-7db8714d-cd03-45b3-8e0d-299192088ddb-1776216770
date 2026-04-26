@@ -66,6 +66,7 @@ export default function BotActivityPage() {
     paid_contracts: 0,
     total_reviews: 0,
   });
+  const [trendData, setTrendData] = useState<any>(null);
 
   useEffect(() => {
     checkAuth();
@@ -156,6 +157,10 @@ export default function BotActivityPage() {
         };
         setStats(newStats);
       }
+
+      // Load trend data
+      const trends = await botLabService.getTrendData();
+      setTrendData(trends);
     } catch (error: any) {
       console.error("Error loading activities:", error);
       toast({
@@ -328,6 +333,76 @@ export default function BotActivityPage() {
               </CardHeader>
             </Card>
           </div>
+
+          {/* Trend Charts */}
+          {trendData && (
+            <>
+              <h2 className="text-xl font-semibold mb-4 mt-8">Activity Trends (Last 7 Days)</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Daily Activity Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Daily Bot Actions</CardTitle>
+                    <CardDescription>Number of actions performed each day</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 flex items-end justify-around gap-2">
+                      {trendData.activityTrend.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">No activity data yet</p>
+                      ) : (
+                        trendData.activityTrend.map((day: any, idx: number) => {
+                          const maxTotal = Math.max(...trendData.activityTrend.map((d: any) => d.total));
+                          const heightPercent = (day.total / maxTotal) * 100;
+                          return (
+                            <div key={idx} className="flex flex-col items-center gap-2 flex-1">
+                              <div className="text-xs font-medium text-primary">{day.total}</div>
+                              <div 
+                                className="w-full bg-primary/70 rounded-t transition-all hover:bg-primary"
+                                style={{ height: `${heightPercent}%`, minHeight: day.total > 0 ? '10px' : '0' }}
+                                title={`${day.date}: ${day.total} actions`}
+                              />
+                              <div className="text-xs text-muted-foreground">{new Date(day.date).getDate()}/{new Date(day.date).getMonth() + 1}</div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Bot Growth Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Bot Growth</CardTitle>
+                    <CardDescription>Cumulative bot count over time</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 flex items-end justify-around gap-2">
+                      {trendData.botGrowth.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">No growth data yet</p>
+                      ) : (
+                        trendData.botGrowth.map((day: any, idx: number) => {
+                          const maxCount = Math.max(...trendData.botGrowth.map((d: any) => d.count));
+                          const heightPercent = (day.count / maxCount) * 100;
+                          return (
+                            <div key={idx} className="flex flex-col items-center gap-2 flex-1">
+                              <div className="text-xs font-medium text-teal-500">{day.count}</div>
+                              <div 
+                                className="w-full bg-teal-500/70 rounded-t transition-all hover:bg-teal-500"
+                                style={{ height: `${heightPercent}%`, minHeight: day.count > 0 ? '10px' : '0' }}
+                                title={`${day.date}: ${day.count} total bots`}
+                              />
+                              <div className="text-xs text-muted-foreground">{new Date(day.date).getDate()}/{new Date(day.date).getMonth() + 1}</div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
 
           <h2 className="text-xl font-semibold mb-4">Activity Logs</h2>
           {/* Filter */}

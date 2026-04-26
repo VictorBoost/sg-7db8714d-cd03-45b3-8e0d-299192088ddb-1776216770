@@ -295,13 +295,13 @@ export const botLabService = {
       await (supabase as any).from("reviews").delete().in("reviewee_id", profileIds);
 
       // 2. Evidence photos (references contracts)
-      const { data: contracts } = await supabase
+      const { data: contracts } = await (supabase as any)
         .from("contracts")
         .select("id")
         .in("client_id", profileIds);
       
       if (contracts && contracts.length > 0) {
-        const contractIds = contracts.map(c => c.id);
+        const contractIds = contracts.map((c: any) => c.id);
         await (supabase as any).from("evidence_photos").delete().in("contract_id", contractIds);
         await (supabase as any).from("contract_messages").delete().in("contract_id", contractIds);
       }
@@ -476,6 +476,56 @@ export const botLabService = {
       typeBreakdown,
       recentAttempts: recentAttempts || [],
       detectionRate: totalAttempts ? ((detected || 0) / totalAttempts * 100).toFixed(1) : "0.0"
+    };
+  },
+
+  async getTrendData() {
+    // Get activity logs for last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: logs } = await supabase
+      .from("bot_activity_logs")
+      .select("created_at, action_type")
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: true });
+
+    // Group by date
+    const dailyActivity = (logs || []).reduce((acc, log) => {
+      const date = new Date(log.created_at).toISOString().split('T')[0];
+      if (!acc[date]) {
+        acc[date] = { date, total: 0, post_project: 0, submit_bid: 0, accept_bid: 0, make_payment: 0, submit_review: 0 };
+      }
+      acc[date].total++;
+      if (log.action_type) {
+        acc[date][log.action_type as keyof typeof acc[typeof date]] = (acc[date][log.action_type as keyof typeof acc[typeof date]] as number) + 1;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Get bot count history (approximate by looking at creation timestamps)
+    const { data: botAccounts } = await supabase
+      .from("bot_accounts")
+      .select("created_at")
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: true });
+
+    const dailyBotGrowth = (botAccounts || []).reduce((acc, bot) => {
+      const date = new Date(bot.created_at).toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Convert to cumulative
+    let cumulativeBots = 0;
+    const botGrowthData = Object.keys(dailyBotGrowth).sort().map(date => {
+      cumulativeBots += dailyBotGrowth[date];
+      return { date, count: cumulativeBots };
+    });
+
+    return {
+      activityTrend: Object.values(dailyActivity),
+      botGrowth: botGrowthData
     };
   }
 };
