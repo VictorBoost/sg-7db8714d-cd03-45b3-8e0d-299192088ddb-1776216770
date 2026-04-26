@@ -24,12 +24,8 @@ export interface ModerationSettings {
   bot_content: boolean;
 }
 
-// Locked types that cannot be changed to auto
-const LOCKED_MANUAL_TYPES: ContentType[] = [
-  "driver_licence",
-  "police_check",
-  "trade_certificate",
-];
+// All document types can now be auto-approved via AI verification
+export const LOCKED_MANUAL_TYPES: ContentType[] = [];
 
 /**
  * Get current moderation settings (singleton row)

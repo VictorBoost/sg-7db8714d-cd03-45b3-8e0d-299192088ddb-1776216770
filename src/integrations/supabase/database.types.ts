@@ -2261,6 +2261,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: string | null
           avatar_url: string | null
           average_rating: number | null
           bio: string | null
@@ -2309,6 +2310,7 @@ export type Database = {
           verification_submitted_at: string | null
         }
         Insert: {
+          account_status?: string | null
           avatar_url?: string | null
           average_rating?: number | null
           bio?: string | null
@@ -2357,6 +2359,7 @@ export type Database = {
           verification_submitted_at?: string | null
         }
         Update: {
+          account_status?: string | null
           avatar_url?: string | null
           average_rating?: number | null
           bio?: string | null
