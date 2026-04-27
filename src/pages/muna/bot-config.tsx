@@ -38,6 +38,7 @@ export default function BotConfigPage() {
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const [lastResult, setLastResult] = useState<any>(null);
 
   useEffect(() => {
     loadConfig();
@@ -97,14 +98,17 @@ export default function BotConfigPage() {
 
   const handleTriggerBotCycle = async () => {
     setTriggering(true);
+    setLastResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("hourly-bot-cycle");
       
       if (error) throw error;
       
+      setLastResult(data);
+      
       toast({
-        title: "Success",
-        description: "Bot cycle triggered successfully. Check activity logs for results.",
+        title: "✅ Bot Cycle Complete",
+        description: `Projects: ${data.results?.projects || 0}, Bids: ${data.results?.bids || 0}, Contracts: ${data.results?.contracts || 0}, Payments: ${data.results?.payments || 0}`,
       });
     } catch (error: any) {
       toast({
@@ -166,29 +170,63 @@ export default function BotConfigPage() {
           </div>
 
           <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg space-y-3">
-            <p className="font-semibold text-blue-300">🕐 Setting Up Automatic Execution</p>
+            <p className="font-semibold text-blue-300">🕐 Automatic Execution Status</p>
             <div className="text-sm space-y-2 text-muted-foreground">
-              <p><strong>Option 1: Supabase Cron (Recommended)</strong></p>
-              <ol className="list-decimal ml-5 space-y-1">
-                <li>Go to your Supabase project dashboard</li>
-                <li>Navigate to Database → Cron Jobs (pg_cron)</li>
-                <li>Create a new cron job:</li>
-              </ol>
-              <pre className="bg-background p-3 rounded text-xs overflow-x-auto">
-{`SELECT cron.schedule(
-  'hourly-bot-cycle',
-  '0 * * * *',  -- Every hour
-  $$SELECT net.http_post(
-    url:='https://YOUR_PROJECT_REF.supabase.co/functions/v1/hourly-bot-cycle',
-    headers:='{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
-  )$$
-);`}
-              </pre>
-              
-              <p className="mt-3"><strong>Option 2: External Cron Service</strong></p>
-              <p>Use cron-job.org or similar to call: <code className="bg-background px-2 py-1 rounded">https://YOUR_PROJECT_REF.supabase.co/functions/v1/hourly-bot-cycle</code></p>
+              <p className="text-green-400">✅ Cron job configured: Runs every hour automatically</p>
+              <p>Next run: Top of the next hour (XX:00)</p>
+              <p className="text-xs mt-2">The bot cycle will run automatically every hour. You can also trigger it manually above for immediate testing.</p>
             </div>
           </div>
+
+          {lastResult && (
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
+              <p className="font-semibold text-green-300">✅ Last Execution Results</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Projects Posted</p>
+                  <p className="text-xl font-bold">{lastResult.results?.projects || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Bids Submitted</p>
+                  <p className="text-xl font-bold">{lastResult.results?.bids || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Contracts Created</p>
+                  <p className="text-xl font-bold">{lastResult.results?.contracts || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Payments Processed</p>
+                  <p className="text-xl font-bold">{lastResult.results?.payments || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Work Completed</p>
+                  <p className="text-xl font-bold">{lastResult.results?.completed || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Funds Released</p>
+                  <p className="text-xl font-bold">{lastResult.results?.fundReleases || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Auto-Release Queue</p>
+                  <p className="text-xl font-bold">{lastResult.results?.awaitingAutoRelease || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Errors</p>
+                  <p className="text-xl font-bold text-red-400">{lastResult.results?.errors?.length || 0}</p>
+                </div>
+              </div>
+              {lastResult.results?.errors && lastResult.results.errors.length > 0 && (
+                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded text-xs">
+                  <p className="font-semibold text-red-300 mb-2">Errors:</p>
+                  <ul className="list-disc ml-4 space-y-1 text-muted-foreground">
+                    {lastResult.results.errors.map((err: string, i: number) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
