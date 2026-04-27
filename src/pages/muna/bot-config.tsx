@@ -37,6 +37,7 @@ export default function BotConfigPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<BotConfig | null>(null);
+  const [triggering, setTriggering] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -94,6 +95,28 @@ export default function BotConfigPage() {
     }
   };
 
+  const handleTriggerBotCycle = async () => {
+    setTriggering(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("hourly-bot-cycle");
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Bot cycle triggered successfully. Check activity logs for results.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to trigger bot cycle",
+        variant: "destructive",
+      });
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   const updateConfig = (field: keyof BotConfig, value: any) => {
     if (!config) return;
     setConfig({ ...config, [field]: value });
@@ -123,6 +146,51 @@ export default function BotConfigPage() {
           </Button>
         </div>
       </div>
+
+      {/* Manual Trigger & Automation Status */}
+      <Card className="border-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            ⚡ Bot Automation Control
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+            <div>
+              <p className="font-semibold">Manual Bot Cycle Trigger</p>
+              <p className="text-sm text-muted-foreground">Run a complete bot activity cycle now</p>
+            </div>
+            <Button onClick={handleTriggerBotCycle} disabled={triggering} size="lg">
+              {triggering ? "Running..." : "▶ Run Bot Cycle Now"}
+            </Button>
+          </div>
+
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg space-y-3">
+            <p className="font-semibold text-blue-300">🕐 Setting Up Automatic Execution</p>
+            <div className="text-sm space-y-2 text-muted-foreground">
+              <p><strong>Option 1: Supabase Cron (Recommended)</strong></p>
+              <ol className="list-decimal ml-5 space-y-1">
+                <li>Go to your Supabase project dashboard</li>
+                <li>Navigate to Database → Cron Jobs (pg_cron)</li>
+                <li>Create a new cron job:</li>
+              </ol>
+              <pre className="bg-background p-3 rounded text-xs overflow-x-auto">
+{`SELECT cron.schedule(
+  'hourly-bot-cycle',
+  '0 * * * *',  -- Every hour
+  $$SELECT net.http_post(
+    url:='https://YOUR_PROJECT_REF.supabase.co/functions/v1/hourly-bot-cycle',
+    headers:='{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+  )$$
+);`}
+              </pre>
+              
+              <p className="mt-3"><strong>Option 2: External Cron Service</strong></p>
+              <p>Use cron-job.org or similar to call: <code className="bg-background px-2 py-1 rounded">https://YOUR_PROJECT_REF.supabase.co/functions/v1/hourly-bot-cycle</code></p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Frequency Settings */}
