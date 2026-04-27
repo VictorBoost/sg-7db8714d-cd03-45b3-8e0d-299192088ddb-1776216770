@@ -7,8 +7,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia",
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-11-20.acacia",
 });
 
 /**
@@ -29,8 +29,12 @@ export default async function handler(
     return res.status(400).json({ error: "Contract ID is required" });
   }
 
+  console.log("🤖 Bot Payment API called for contract:", contractId);
+
   try {
     console.log("🔍 Looking up contract:", contractId);
+    console.log("   Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("   Service key exists:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
     
     // Get contract details with simple query first
     const { data: contract, error: contractError } = await supabase
@@ -39,9 +43,15 @@ export default async function handler(
       .eq("id", contractId)
       .single();
 
+    console.log("   Contract query result:", { found: !!contract, error: contractError });
+
     if (contractError) {
       console.error("❌ Contract lookup error:", contractError);
-      return res.status(404).json({ error: "Contract not found", details: contractError.message });
+      return res.status(404).json({ 
+        error: "Contract not found", 
+        details: contractError.message,
+        code: contractError.code 
+      });
     }
 
     if (!contract) {
