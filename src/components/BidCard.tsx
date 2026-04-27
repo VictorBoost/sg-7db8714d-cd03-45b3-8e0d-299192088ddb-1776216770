@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { getBidBadges } from "@/services/badgeService";
 import type { ProviderBadge as BadgeType } from "@/services/badgeService";
 import { ProviderBadge } from "./ProviderBadge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 type Bid = Tables<"bids">;
 
