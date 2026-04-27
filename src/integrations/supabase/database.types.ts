@@ -976,6 +976,7 @@ export type Database = {
           id: string
           max_sales: number | null
           min_sales: number
+          proration_days: number | null
           standard_rate: number
           tier_name: string
           tier_order: number
@@ -987,6 +988,7 @@ export type Database = {
           id?: string
           max_sales?: number | null
           min_sales: number
+          proration_days?: number | null
           standard_rate: number
           tier_name: string
           tier_order: number
@@ -998,6 +1000,7 @@ export type Database = {
           id?: string
           max_sales?: number | null
           min_sales?: number
+          proration_days?: number | null
           standard_rate?: number
           tier_name?: string
           tier_order?: number

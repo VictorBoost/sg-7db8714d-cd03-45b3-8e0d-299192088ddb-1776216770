@@ -780,19 +780,30 @@ export default function ControlCentre() {
                   Monitoring & Logs
                 </h2>
                 <div className="grid gap-4">
-                  <Link href="/muna/bot-activity">
-                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                  <Link href="/muna/bot-lab">
+                    <Card className="cursor-pointer hover:border-primary transition-colors">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                          <Bot className="h-5 w-5" />
-                          Bot Activity Dashboard
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                          Bot Lab
                         </CardTitle>
-                        <CardDescription>
-                          Real-time monitoring of bot actions: bids, contracts, payments
-                        </CardDescription>
+                        <CardDescription>Generate & manage bot accounts, configure automation settings</CardDescription>
                       </CardHeader>
                     </Card>
                   </Link>
+
+                  <Link href="/muna/bot-activity">
+                    <Card className="cursor-pointer hover:border-primary transition-colors">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                            Bot Live Feed
+                        </CardTitle>
+                        <CardDescription>Real-time bot activity logs and statistics</CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </Link>
+
                   <Link href="/muna/monalisa-logs">
                     <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                       <CardHeader>
@@ -907,20 +918,6 @@ export default function ControlCentre() {
                           className="border-accent"
                         >
                           MonaLisa Logs
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => router.push("/muna/test-email")}
-                          className="border-primary"
-                        >
-                          Test Email
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => router.push("/muna/test-cycle")}
-                          className="border-primary"
-                        >
-                          Test Full Cycle
                         </Button>
                       </>
                     )}

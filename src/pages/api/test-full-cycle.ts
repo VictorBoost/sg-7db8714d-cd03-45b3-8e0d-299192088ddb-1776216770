@@ -265,22 +265,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.warn("   ⚠️ Fund release emails failed:", emailErr);
     }
 
+    console.log("✅ Full cycle test completed successfully!");
+    console.log("📧 Check both email addresses for notifications");
+
     return res.status(200).json({
       success: true,
-      message: "Full cycle completed successfully with emails and random categories!",
-      data: {
-        client: { id: clientProfile.id, email: clientEmail },
-        provider: { id: providerProfile.id, email: providerEmail },
-        project: { id: project.id, title: project.title, category: randomProject.cat },
-        bid: { id: bid.id, amount: bid.amount },
-        contract: { id: contract.id, status: "completed" },
-        payment: paymentResult,
-        reviews: { client: 5, provider: 5 }
-      }
+      message: "Full cycle test completed",
+      clientEmail,
+      providerEmail,
+      projectId: project.id,
+      contractId: contract.id,
+      finalAmount: (contract.final_amount || bid.amount).toFixed(2)
     });
 
   } catch (error: any) {
-    console.error("❌ Full cycle test failed:", error);
+    console.error("❌ Full cycle test error:", error);
     return res.status(500).json({ 
       error: error.message,
       details: error.toString()

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Head from "next/head";
 import { SEO } from "@/components/SEO";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
@@ -13,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Contact() {
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -23,8 +25,38 @@ export default function Contact() {
   const [screenshots, setScreenshots] = useState<File[]>([]);
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Load Cloudflare Turnstile script
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+
+    // Set up callback function
+    (window as any).onTurnstileSuccess = (token: string) => {
+      console.log("✅ Turnstile verification successful");
+      setTurnstileToken(token);
+    };
+
+    return () => {
+      document.head.removeChild(script);
+      delete (window as any).onTurnstileSuccess;
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!turnstileToken) {
+      toast({
+        title: "Verification Required",
+        description: "Please complete the security check",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -54,7 +86,7 @@ export default function Contact() {
       const submissionSource = currentDomain.includes('.co.nz') ? 'bluetika.co.nz' : currentDomain;
 
       // Send email to admin using contact API
-      await fetch("/api/contact", {
+      const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -65,8 +97,13 @@ export default function Contact() {
           message: formData.message,
           domain: submissionSource,
           screenshots: screenshotUrls,
+          turnstileToken: turnstileToken,
         }),
       });
+
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
 
       toast({
         title: "Message sent!",
@@ -75,6 +112,12 @@ export default function Contact() {
       
       setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
       setScreenshots([]);
+      setTurnstileToken("");
+      
+      // Reset Turnstile widget
+      if (typeof window !== 'undefined' && (window as any).turnstile) {
+        (window as any).turnstile.reset();
+      }
     } catch (error) {
       console.error("Contact form error:", error);
       toast({
@@ -239,10 +282,20 @@ export default function Contact() {
                     )}
                   </div>
 
+                  {/* Cloudflare Turnstile CAPTCHA */}
+                  <div className="flex justify-center">
+                    <div 
+                      className="cf-turnstile" 
+                      data-sitekey="0x4AAAAAAAzqn9K_y-JLOsrB"
+                      data-callback="onTurnstileSuccess"
+                      data-theme="light"
+                    ></div>
+                  </div>
+
                   <Button 
                     type="submit" 
                     className="w-full bg-primary hover:bg-primary/90"
-                    disabled={loading}
+                    disabled={loading || !turnstileToken}
                   >
                     {loading ? "Sending..." : "Send Message"}
                   </Button>

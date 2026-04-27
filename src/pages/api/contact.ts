@@ -10,10 +10,39 @@ export default async function handler(
   }
 
   try {
-    const { name, email, phone, subject, message, domain, screenshots = [] } = req.body;
+    const { name, email, phone, subject, message, domain, screenshots = [], turnstileToken } = req.body;
+
+    console.log("📧 Contact form submission received:");
+    console.log("   From:", email);
+    console.log("   Name:", name);
+    console.log("   Domain:", domain);
+    console.log("   Subject:", subject);
+    console.log("   Turnstile token:", turnstileToken ? "Present" : "Missing");
 
     if (!name || !email || !message) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Verify Turnstile token
+    if (turnstileToken) {
+      console.log("   🔒 Verifying Turnstile token...");
+      const verifyResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAAzqn4X6IKF_OsVoTOb_zWBdyU4',
+          response: turnstileToken,
+        }),
+      });
+
+      const verifyData = await verifyResponse.json();
+      console.log("   Turnstile verification result:", verifyData.success ? "✅ Valid" : "❌ Invalid");
+
+      if (!verifyData.success) {
+        return res.status(400).json({ error: "CAPTCHA verification failed" });
+      }
+    } else {
+      console.log("   ⚠️ No Turnstile token provided (skipping verification)");
     }
 
     // Build email body with rich formatting
@@ -118,13 +147,21 @@ export default async function handler(
       </div>
     `;
 
-    await sesEmailService.sendEmail({
+    console.log("   📧 Sending admin notification...");
+    const adminEmailSent = await sesEmailService.sendEmail({
       to: adminEmail,
       subject: `Contact Form: ${subject || 'New Message'} from ${domain}`,
       htmlBody: adminHtmlBody,
     });
 
+    if (!adminEmailSent) {
+      console.error("   ❌ Failed to send admin notification");
+      throw new Error("Failed to send admin notification email");
+    }
+    console.log("   ✅ Admin notification sent successfully");
+
     // Send confirmation to user
+    console.log("   📧 Sending user confirmation...");
     const userHtmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1B4FD8;">Thank You for Contacting BlueTika</h2>
@@ -149,15 +186,22 @@ export default async function handler(
       </div>
     `;
 
-    await sesEmailService.sendEmail({
+    const userEmailSent = await sesEmailService.sendEmail({
       to: email,
       subject: "BlueTika: We've received your message",
       htmlBody: userHtmlBody,
     });
 
+    if (!userEmailSent) {
+      console.warn("   ⚠️ Failed to send user confirmation (but admin was notified)");
+    } else {
+      console.log("   ✅ User confirmation sent successfully");
+    }
+
+    console.log("✅ Contact form processed successfully");
     return res.status(200).json({ success: true });
   } catch (error: any) {
-    console.error("Contact form error:", error);
+    console.error("❌ Contact form error:", error);
     return res.status(500).json({ error: error.message });
   }
 }

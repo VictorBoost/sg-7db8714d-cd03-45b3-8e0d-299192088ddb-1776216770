@@ -76,7 +76,6 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
     });
     
     console.log("   Response status:", response.status);
-    console.log("   Response headers:", Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
