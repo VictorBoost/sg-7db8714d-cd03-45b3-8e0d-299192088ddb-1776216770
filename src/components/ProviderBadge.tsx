@@ -1,41 +1,69 @@
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import * as LucideIcons from "lucide-react";
 
 interface ProviderBadgeProps {
+  badge?: any; // To support achievement badges from badgeService
   verificationTier?: string | null;
   verificationStatus?: string | null;
   commissionTier?: string | null;
 }
 
-export function ProviderBadge({ verificationTier, verificationStatus, commissionTier }: ProviderBadgeProps) {
-  if (verificationStatus !== "verified") {
+export function ProviderBadge({ badge, verificationTier, verificationStatus, commissionTier }: ProviderBadgeProps) {
+  // 1. Render achievement badges if badge object is passed
+  if (badge) {
+    const IconComponent = (LucideIcons as any)[badge.icon || "Award"] || LucideIcons.Award;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="secondary" className="flex items-center gap-1 bg-primary/10 text-primary hover:bg-primary/20 cursor-default">
+              <IconComponent className="h-3 w-3" />
+              {badge.name}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-sm">{badge.description}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  // 2. Render Verification and Commission Tiers next to the name
+  if (!verificationTier && !commissionTier) {
     return null;
   }
 
-  const tierColors = {
-    Bronze: "bg-amber-700 text-white",
-    Silver: "bg-gray-400 text-gray-900",
-    Gold: "bg-yellow-500 text-gray-900",
-    Platinum: "bg-purple-600 text-white",
+  const tierColors: Record<string, string> = {
+    Bronze: "bg-amber-700 text-white hover:bg-amber-800",
+    Silver: "bg-slate-400 text-slate-900 hover:bg-slate-500",
+    Gold: "bg-yellow-500 text-yellow-950 hover:bg-yellow-600",
+    Platinum: "bg-purple-600 text-white hover:bg-purple-700",
   };
 
-  const commissionTierColors = {
-    no_tier: "bg-gray-500 text-white",
-    bronze: "bg-amber-700 text-white",
-    silver: "bg-gray-400 text-gray-900",
-    gold: "bg-yellow-500 text-gray-900",
-    platinum: "bg-purple-600 text-white",
+  const commissionTierColors: Record<string, string> = {
+    bronze: "bg-amber-700 text-white hover:bg-amber-800",
+    silver: "bg-slate-400 text-slate-900 hover:bg-slate-500",
+    gold: "bg-yellow-500 text-yellow-950 hover:bg-yellow-600",
+    platinum: "bg-purple-600 text-white hover:bg-purple-700",
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {verificationTier && (
-        <Badge className={tierColors[verificationTier as keyof typeof tierColors] || "bg-primary"}>
+    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      {verificationTier && verificationStatus === "verified" && (
+        <Badge className={tierColors[verificationTier] || "bg-primary text-primary-foreground"}>
           ✓ {verificationTier}
         </Badge>
       )}
       {commissionTier && commissionTier !== 'no_tier' && (
-        <Badge className={commissionTierColors[commissionTier as keyof typeof commissionTierColors] || "bg-muted"}>
-          📊 {commissionTier.charAt(0).toUpperCase() + commissionTier.slice(1)} Commission
+        <Badge className={commissionTierColors[commissionTier.toLowerCase()] || "bg-muted"}>
+          {commissionTier.charAt(0).toUpperCase() + commissionTier.slice(1)}
         </Badge>
       )}
     </div>

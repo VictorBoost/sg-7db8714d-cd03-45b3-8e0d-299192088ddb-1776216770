@@ -69,7 +69,14 @@ export function ProviderProfileModal({ open, onOpenChange, provider }: ProviderP
           <DialogHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <DialogTitle className="text-2xl">{provider.full_name || "Service Provider"}</DialogTitle>
+                <DialogTitle className="text-2xl flex flex-wrap items-center gap-3">
+                  <span>{provider.full_name || "Service Provider"}</span>
+                  <ProviderBadge 
+                    verificationTier={provider.verification_tier}
+                    verificationStatus={provider.verification_status}
+                    commissionTier={provider.commission_tier}
+                  />
+                </DialogTitle>
                 {memberSince && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Member since {memberSince}

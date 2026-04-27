@@ -21,6 +21,7 @@ interface BidCardProps {
       response_rate: number | null;
       commission_tier: string | null;
       verification_status: string | null;
+      verification_tier?: string | null;
       created_at: string | null;
     };
     projects?: {
@@ -87,11 +88,16 @@ export function BidCard({ bid, isProjectOwner, onAccept, onViewProvider, accepti
             <div className="flex items-center gap-2 mb-2">
               <button
                 onClick={() => onViewProvider?.(bid.provider_id)}
-                className="flex items-center gap-2 hover:underline"
+                className="flex items-center gap-2 hover:underline text-left"
               >
-                <User className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg">
-                  {bid.profiles?.full_name || bid.profiles?.email || "Service Provider"}
+                <User className="h-5 w-5 text-muted-foreground shrink-0" />
+                <CardTitle className="text-lg flex flex-wrap items-center gap-2">
+                  <span>{bid.profiles?.full_name || bid.profiles?.email || "Service Provider"}</span>
+                  <ProviderBadge 
+                    verificationTier={bid.profiles?.verification_tier}
+                    verificationStatus={bid.profiles?.verification_status}
+                    commissionTier={bid.profiles?.commission_tier}
+                  />
                 </CardTitle>
               </button>
             </div>
