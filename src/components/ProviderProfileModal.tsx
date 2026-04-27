@@ -21,6 +21,7 @@ interface ProviderProfileModalProps {
     reviews?: Review[];
     provider_categories?: Array<{ categories: { name: string } }>;
     trade_certificates?: Array<{ certificate_type: string; document_url: string }>;
+    verification_tier?: string | null;
   } | null;
 }
 
