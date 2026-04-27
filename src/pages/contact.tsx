@@ -144,7 +144,7 @@ export default function Contact() {
         description: "We'll get back to you within 24 hours.",
       });
       
-      setFormData({ name: "", email: "", subject: "", message: "" });
+      setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
       setScreenshots([]);
     } catch (error) {
       console.error("Contact form error:", error);
