@@ -113,6 +113,31 @@ export default function Contact() {
         throw new Error("Failed to send email");
       }
 
+      // Send email to admin using SES
+      const adminEmail = "support@bluetika.co.nz";
+      const userEmail = formData.email;
+      const userMessage = formData.message;
+      const userName = formData.name;
+      const userPhone = formData.phone || "Not provided";
+      const userSubject = formData.subject;
+      
+      // Detect which domain the form was submitted from
+      const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'bluetika.co.nz';
+      const submissionSource = currentDomain.includes('.co.nz') ? 'bluetika.co.nz' : currentDomain;
+
+      await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: userName,
+          email: userEmail,
+          phone: userPhone,
+          subject: userSubject,
+          message: userMessage,
+          domain: submissionSource,
+        }),
+      });
+
       toast({
         title: "Message sent!",
         description: "We'll get back to you within 24 hours.",
