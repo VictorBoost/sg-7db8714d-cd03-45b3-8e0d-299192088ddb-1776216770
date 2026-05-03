@@ -1,0 +1,28 @@
+# BlueTika Robots.txt
+# https://bluetika.co.nz/robots.txt
+
+User-agent: *
+Allow: /
+
+# Disallow admin areas
+Disallow: /muna/
+Disallow: /api/
+Disallow: /checkout/
+Disallow: /checkout-additional/
+
+# Disallow auth pages
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /auth/
+
+# Allow important pages
+Allow: /projects
+Allow: /categories/
+Allow: /directory
+Allow: /about
+Allow: /contact
+Allow: /faq
+
+# Dynamic sitemap (auto-updated)
+Sitemap: https://bluetika.co.nz/api/sitemap.xml

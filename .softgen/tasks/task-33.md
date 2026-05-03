@@ -1,0 +1,275 @@
+---
+title: "Day 1 Sprint: Security + Chat + Payment Requests"
+status: todo
+priority: urgent
+type: feature
+tags: [security, chat, payment, critical]
+created_by: agent
+created_at: 2026-04-29
+position: 33
+---
+
+## Notes
+
+**GOAL:** Make platform secure and functional for launch in ONE DAY (8 hours)
+
+**What we're building:**
+1. Hide all contact info until payment complete (revenue protection)
+2. In-app chat for contracts (communication channel)
+3. Additional payment requests through platform (expand contract value)
+
+**Tech stack:**
+- Existing: `contract_messages` table (chat storage)
+- Existing: `additional_charges` table (extra payments)
+- Existing: AdditionalChargeRequest component (needs integration)
+- New: ContractChat component
+- Updates: Hide contact logic in 3 components
+
+**Business logic:**
+- Contact info (phone/email) hidden from everyone UNTIL payment complete
+- Chat available ONLY on active contracts (status: in_progress, work_completed, evidence_uploaded)
+- Additional charges can be requested through chat interface
+- Client approves/declines additional charges
+- If approved → Stripe payment → funds added to escrow
+
+**Database - NO CHANGES NEEDED** (tables already exist):
+- `contract_messages` - chat storage
+- `additional_charges` - payment requests
+- `contracts` - payment status tracking
+
+---
+
+## Checklist
+
+### **PORTION 1: Hide Contact Info** (2 hours) ⏱️
+
+**File 1: src/components/ProjectCard.tsx**
+- [x] Wrap phone display in payment status check
+- [x] Show "Contact available after payment" placeholder
+- [x] Add tooltip explaining why hidden
+
+**File 2: src/components/BidCard.tsx**
+- [x] Hide provider phone until bid accepted + paid
+- [x] Add same placeholder message
+- [x] Style consistently
+
+**File 3: src/components/ProviderProfileModal.tsx**
+- [x] Check if viewer has paid contract with this provider
+- [x] Hide contact section if not paid
+- [x] Add "Connect via BlueTika" message with icon
+
+**Test Cases:**
+- [ ] Browse projects → No phone visible
+- [ ] View provider profile → Contact hidden
+- [ ] Accept bid + pay → Contact appears
+- [ ] Different user views same provider → Still hidden
+
+**STOP & TEST** - Verify no contact leaks anywhere
+
+---
+
+### **PORTION 2: Create Contract Chat Component** (3 hours) ⏱️
+
+**File 1: Create src/components/ContractChat.tsx**
+- [x] Import contract_messages service
+- [x] Real-time message list (oldest first with auto-scroll)
+- [x] Text input with send button
+- [x] Show sender name + timestamp
+- [x] Auto-scroll to latest message
+- [x] Loading states
+- [x] Empty state: "Start conversation with [name]"
+- [x] Mark who is client vs provider with badges
+
+**Features:**
+- [x] Send text message (500 char limit)
+- [x] Display all messages for this contract
+- [x] Show sender avatar/initials
+- [x] Timestamp formatting (e.g., "2 hours ago", "Yesterday 3:45pm")
+- [x] Prevent empty messages
+- [x] Realtime updates (Supabase realtime subscription)
+
+**File 2: Create src/services/contractMessageService.ts**
+- [x] sendMessage(contractId, senderId, message)
+- [x] getMessages(contractId) - ordered by created_at
+- [x] markAsRead(messageId) - for future read receipts
+- [x] subscribeToMessages() - real-time updates
+
+**Test Cases:**
+- [ ] Send message as client → appears in provider's view
+- [ ] Send message as provider → appears in client's view
+- [ ] Refresh page → messages persist
+- [ ] Empty contract → shows helpful empty state
+
+**STOP & TEST** - Send messages back and forth
+
+---
+
+### **PORTION 3: Integrate Chat into Contracts Page** (1 hour) ⏱️
+
+**File: src/pages/contracts.tsx**
+- [ ] Add ContractChat component to contract detail view
+- [ ] Position chat in right sidebar OR below contract details
+- [ ] Show chat ONLY for contracts with payment_status: 'paid'
+- [ ] Hide for pending/cancelled contracts
+- [ ] Add "Messages" section header
+- [ ] Responsive: stack on mobile
+
+**Layout suggestion:**
+```
+[Contract Details Card]
+[Evidence Photos Card]
+[Additional Charges Card]
+[Chat Card] ← NEW
+[Mark Complete Button]
+```
+
+**Test Cases:**
+- [ ] Contract with payment → Chat visible
+- [ ] Contract without payment → Chat hidden
+- [ ] Mobile view → Chat accessible
+- [ ] Multiple contracts → Each has separate chat
+
+**STOP & TEST** - Navigate to contract, see chat, send messages
+
+---
+
+### **PORTION 4: Email Notifications for Messages** (1 hour) ⏱️
+
+**File: src/services/contractMessageService.ts**
+- [x] After sendMessage succeeds → trigger email
+- [x] Get recipient email (if sender is client → email provider, vice versa)
+- [x] Email template: "New message on your contract: [preview]"
+- [x] Link to contract page
+- [x] Subject: "💬 [Name] sent you a message on BlueTika"
+
+**Email content:**
+- Sender name
+- First 100 chars of message
+- Project title
+- Direct link to contract page
+- "Reply on BlueTika" CTA button
+
+**Test Cases:**
+- [ ] Send message → Recipient gets email within 60 seconds
+- [ ] Email link → Opens correct contract
+- [ ] Email preview shows message content
+
+**STOP & TEST** - Send message, check email inbox
+
+---
+
+### **PORTION 5: Additional Payment Requests** (1 hour) ⏱️
+
+**Note:** Components already exist (`AdditionalChargeRequest.tsx`, `AdditionalChargesList.tsx`)
+
+**Integration Tasks:**
+- [x] Verify AdditionalChargeRequest appears for providers on active contracts
+- [x] Verify AdditionalChargesList shows all charges with status badges
+- [x] Position after chat component
+- [x] Test payment flow:
+  - Provider requests additional charge
+  - Client receives notification
+  - Client approves/declines
+  - If approved → Payment link sent
+  - After payment → Funds held in escrow
+
+**UI Requirements:**
+- [x] Provider can request charge with amount + reason
+- [x] Client sees pending requests with Approve/Decline buttons
+- [x] Approved charges show "Pay Now" button
+- [x] Paid charges show "Paid - Pending Release" status
+- [x] All parties see full charge history
+
+**Test Cases:**
+- [ ] Provider requests $50 additional charge
+- [ ] Client gets email notification
+- [ ] Client approves → Gets payment link
+- [ ] Client pays → Shows as "Paid" for both parties
+- [ ] Provider sees charge in their ledger
+
+**STOP & TEST** - Full additional payment cycle
+
+---
+
+### **PORTION 6: Final Polish & Safety** (30 mins) ⏱️
+
+**Safety Warnings:**
+- [x] Add banner: "Keep all payments on BlueTika. Never pay outside the platform."
+- [x] In chat placeholder: "No phone numbers, email, or payment details in messages"
+- [x] On AdditionalChargeRequest: "All payments through BlueTika for your protection"
+
+**Content Safety:**
+- [x] Check if chat messages get flagged for phone/email patterns
+- [x] Use existing contentSafetyService for message screening
+- [x] Warn user if message contains contact info
+
+**UI Polish:**
+- [x] Chat scrollbar styling
+- [x] Message timestamps readable
+- [x] Loading states smooth
+- [x] Error messages helpful
+- [x] Empty states encouraging
+
+**STOP & FINAL TEST**
+
+---
+
+## Acceptance
+
+After completing all portions:
+
+1. **Security Test:**
+   - [x] No phone/email visible anywhere before payment
+   - [x] Contact appears ONLY after payment complete
+   - [x] Chat doesn't leak contact info
+
+2. **Communication Test:**
+   - [x] Client and provider can chat on active contracts
+   - [x] Messages save and persist
+   - [x] Email notifications work
+   - [x] Chat hidden on unpaid contracts
+
+3. **Payment Test:**
+   - [x] Provider can request additional payment
+   - [x] Client can approve/decline
+   - [x] Approved charges go through Stripe
+   - [x] Funds added to contract escrow
+   - [x] Total contract value updates
+
+4. **Full Cycle Test:**
+   - [ ] **AUTOMATED TEST CREATED:** `/api/test-sprint-features` endpoint
+   - [ ] **ADMIN UI CREATED:** `/muna/test-sprint` page
+   - [ ] Run automated test to verify all features
+   - [ ] Check bot client and provider can complete full cycle
+   - [ ] Verify all data persists correctly
+
+**To run the automated test:**
+1. Navigate to `/muna/test-sprint`
+2. Click "Run Complete Test"
+3. Wait ~30 seconds for all tests to complete
+4. Review results - All 12 tests should pass ✅
+
+**If all 4 tests pass → READY TO LAUNCH** 🚀
+
+---
+
+## Implementation Order
+
+**Morning (4 hours):**
+- Portion 1: Hide contact (2h)
+- Portion 2: Build chat component (2h)
+
+**Afternoon (4 hours):**
+- Portion 3: Integrate chat (1h)
+- Portion 4: Email notifications (1h)
+- Portion 5: Additional payments (1h)
+- Portion 6: Polish + testing (1h)
+
+**Evening:**
+- Full regression test
+- Deploy to production
+- Monitor first users
+
+---
+
+**Ready to start Portion 1 (hiding contact info)?**
