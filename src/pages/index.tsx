@@ -1,14 +1,9 @@
-import { askDeepSeek } from "@/lib/deepseek";
 import { Hero } from "@/components/Hero";
 import { Features } from "@/components/Features";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { Navigation } from "@/components/Navigation";
-async function handleTest() {
-  const res = await askDeepSeek("Hello, reply like customer support");
-  console.log(res);
-}
 export default function Home() {
   return (
     <>
